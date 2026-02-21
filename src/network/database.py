@@ -145,6 +145,14 @@ class LabkeyAPI(APIWrapper):
 
     @classmethod
     def init_from_json(cls, verbose: bool = False):
+        """Initialize Labkey API with configuration values from .env file.
+
+        Args:
+            verbose (bool, optional): Verbose printing for the API. Defaults to False.
+
+        Returns:
+            api (LabkeyAPI): LabkeyAPI instance.
+        """
         conf = read_json("./network.json")["labkey"]
 
         if verbose:
@@ -157,14 +165,9 @@ class LabkeyAPI(APIWrapper):
         return cls(conf["domain"], conf["container_path"], verbose=verbose)
 
 
+"""
 def labkey_from_dotenv(verbose: bool = False) -> LabkeyAPI:
-    """Initialize Labkey API with configuration values from .env file.
 
-    Args:
-        verbose (bool, optional): Verbose printing for the API. Defaults to False.
-
-    Returns:
-        api (LabkeyAPI): LabkeyAPI object.
-    """
     config = dotenv_values()
     return LabkeyAPI(config["domain"], config["container_path"], verbose=verbose)
+"""
