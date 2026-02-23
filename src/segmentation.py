@@ -4,7 +4,6 @@ from time import perf_counter
 
 import nibabel as nib
 from nibabel import Nifti1Image
-from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 from src import utils
 from src.utils import DEFAULT_VERTEBRA_CLASSES
@@ -17,10 +16,10 @@ logger = get_logger(__name__)
 
 MODEL_DIR = Path("models", "muscle_fat_tissue_stanford_0_0_2")
 
-tissue_predictor = nnUNetPredictor()
-tissue_predictor.initialize_from_trained_model_folder(
-    "models/mazurowski_muscle_fat", use_folds=(5,)
-)
+# tissue_predictor = nnUNetPredictor()
+# tissue_predictor.initialize_from_trained_model_folder(
+#     "models/mazurowski_muscle_fat", use_folds=(5,)
+# )
 
 
 def segment_ct_study(
