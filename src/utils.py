@@ -3,7 +3,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Union
+from typing import Any
 
 import nibabel as nib
 import numpy as np
@@ -11,18 +11,17 @@ import pandas as pd
 import skimage as sk
 from nibabel.nifti1 import Nifti1Image
 from numpy.typing import NDArray
+from pydicom import dcmread
 
 from src import slogger
 from src.classes import (
-    Centroids,
     ImageData,
-    LabkeyRow,
     MetricsData,
     SeriesData,
     StudyData,
 )
 
-DEFAULT_VERTEBRA_CLASSES = {
+DEFAULT_VERTEBRA_CLASSES: dict[str, int] = {
     "vertebrae_L1": 31,
     "vertebrae_L2": 30,
     "vertebrae_L3": 29,
@@ -31,7 +30,12 @@ DEFAULT_VERTEBRA_CLASSES = {
     "vertebrae_S1": 26,
 }
 
-DEFAULT_TISSUE_CLASSES = {"muscle": 1, "sat": 2, "vat": 3, "imat": 4}
+DEFAULT_TISSUE_CLASSES: dict[str, int] = {
+    "sat": 2,
+    "vat": 3,
+    "imat": 4,
+    "muscle": 1,
+}
 
 TISSUE_LABEL_INDEX = list(DEFAULT_TISSUE_CLASSES.keys())
 
@@ -56,20 +60,20 @@ def get_vertebrae_body_centroids(
             Vertebrae centroid in voxel space.
     """
 
-    mask_arr = mask.get_fdata().astype(np.uint8)
+    mask_arr: NDArray = mask.get_fdata().astype(np.uint8)
 
     # get sagittal slice at L3's center
-    vert_label_centroid = np.rint(sk.measure.centroid(mask_arr == vert_labels)).astype(
-        np.uint16
-    )
-    sagittal_slice_arr = mask_arr[vert_label_centroid[0], ...]
+    vert_label_centroid: NDArray = np.rint(
+        sk.measure.centroid(mask_arr == vert_labels)
+    ).astype(np.uint16)
+    sagittal_slice_arr: NDArray = mask_arr[vert_label_centroid[0], ...]
     sagittal_l3 = np.where(sagittal_slice_arr == vert_labels, vert_labels, 0)
 
     # relabel L3 parts
-    vert_components = sk.measure.label(sagittal_l3)
+    vert_components: NDArray = sk.measure.label(sagittal_l3)
 
     # get 2 largest components
-    compoments_pixel_num = {
+    compoments_pixel_num: dict[int, int] = {
         prop.label: prop.num_pixels for prop in sk.measure.regionprops(vert_components)
     }
     largest_components_labels = sorted(
@@ -102,100 +106,6 @@ def get_vertebrae_body_centroids(
     return vert_body_centroid, vert_label_centroid
 
 
-def extract_slices(
-    ct_volume: Union[Nifti1Image, Path, str],
-    spine_mask: Union[Nifti1Image, Path, str],
-    output_dir: Union[Path, str],
-    slices_num: int = 0,
-) -> tuple[ImageData, Centroids, float]:
-    """
-    Extract axial slices from input CT volume at vertebrae body's centroid.
-
-    Args:
-        ct_volume (Union[Nifti1Image, Path, str]): Input CT volume.
-        spine_mask (Union[Nifti1Image, Path, str]): Segmented spine mask with labeled vertebrae.
-        output_dir (Union[Path, str]): directory to save extracted slices data.
-        slices_num (int, optional): Number of slices to extract. Defaults to 0. If slicing range extends CT volume size, it will be clipped to volume's size.
-
-    Raises:
-        FileNotFoundError: If input CT volume is not found.
-        FileNotFoundError: If segmented spine mask is not found.
-
-    Returns:
-
-    """
-    if not isinstance(spine_mask, Nifti1Image):
-        if Path(spine_mask).exists():
-            spine_mask = nib.as_closest_canonical(nib.load(spine_mask))
-        else:
-            raise FileNotFoundError(spine_mask)
-
-    if not isinstance(ct_volume, Nifti1Image):
-        if Path(ct_volume).exists():
-            ct_volume = nib.as_closest_canonical(nib.load(ct_volume))
-        else:
-            raise FileNotFoundError(ct_volume)
-
-    start = perf_counter()
-    body_centroid, vert_centroid = get_vertebrae_body_centroids(
-        spine_mask, DEFAULT_VERTEBRA_CLASSES["vertebrae_L3"]
-    )
-
-    # requires slices_num=2 at minimum
-    if slices_num >= 2:
-        slices_range = [
-            # extract slices in Z direction (superior-inferior)
-            body_centroid[-1] - (slices_num // 2),
-            body_centroid[-1] + (slices_num // 2),
-        ]
-    else:
-        slices_range = [body_centroid[-1], body_centroid[-1]]
-
-    slices_range[-1] += 1  # nibabel slicer requires range [..., i:i + 1]
-
-    if slices_range[0] < 0:
-        slices_range[0] = 0
-        logger.info(
-            f"lower index {slices_range[0]} is outside lower extent for Z dimension, setting to 0"
-        )
-
-    z_size = ct_volume.shape[-1]
-    if slices_range[1] > z_size:
-        slices_range[1] = z_size
-        slices_range[0] -= 1
-        logger.info(
-            f"upper index {slices_range[1]} is outside upper extent for Z dimension {z_size}, setting to {z_size}"
-        )
-
-    logger.info(
-        f"extracting {slices_range[1] - slices_range[0]} slices in range {slices_range}"
-    )
-
-    sliced_volume = ct_volume.slicer[..., slices_range[0] : slices_range[1]]
-    sliced_volume = nib.as_closest_canonical(sliced_volume)
-
-    output_filepath = Path(output_dir, "tissue_slices.nii.gz")
-    if output_filepath.exists():
-        logger.info(f"file `{output_filepath}` exists, overwriting")
-
-    try:
-        nib.save(sliced_volume, output_filepath)
-    except RuntimeError as err:
-        logger.error(err)
-
-    duration = perf_counter() - start
-    logger.info(f"slice extraction finished in {duration} seconds")
-
-    return (
-        ImageData(image=sliced_volume, path=output_filepath),
-        Centroids(
-            vertebre_centroid=vert_centroid.tolist(),
-            body_centroid=body_centroid.tolist(),
-        ),
-        duration,
-    )
-
-
 def postprocess_tissue_masks(
     mask_data: ImageData,
     volume_data: ImageData,
@@ -203,10 +113,10 @@ def postprocess_tissue_masks(
     """
     store tissue labels in separate z-axis
     tissue      | label     | z-axis index
-    sat         | 1         | 0
-    vat         | 2         | 1
-    imat        | 3         | 2
-    muscle      | 4         | 3
+    muscle      | 1         | 0
+    sat         | 2         | 1
+    vat         | 3         | 2
+    imat        | 4         | 3
     """
     start = perf_counter()
     mask_arr = mask_data.image.get_fdata().astype(np.uint8)
@@ -308,15 +218,28 @@ def compute_metrics(
     return MetricsData(area=area, mean_hu=mean_hu, skelet_muscle_index=smi)
 
 
+# TODO: maybe add verify_dicom_study()?? possibly no
+def verify_dicom_study(study_inst_uid: str, dicom_filepath: str | Path):
+    ds = dcmread(
+        dicom_filepath,
+        stop_before_pixels=True,
+        specific_tags=["PatientID", "StudyInstanceUID"],
+    )
+    logger.info(
+        f"verifying study instance uids:\nLabkey={study_inst_uid}\nDICOM={ds.StudyInstanceUID}"
+    )
+    return study_inst_uid == ds.StudyInstanceUID
+
+
 def read_patient_list(
-    filepath: Union[str, Path], columns: list[str] | None = None
-) -> Union[pd.DataFrame, None]:
+    filepath: str | Path, columns: list[str] | None = None
+) -> pd.DataFrame:
     if isinstance(filepath, str):
         filepath = Path(filepath)
 
     if not filepath.is_file() or not filepath.exists():
         logger.error(f"patient list at `{filepath}` is not a file or doesn't exist")
-        return None
+        raise FileNotFoundError(f"Patient list file not found at {filepath}")
 
     suffix = filepath.suffix
     if suffix == ".csv":
@@ -331,47 +254,26 @@ def read_patient_list(
     return df
 
 
-def read_study_case(filepath: Union[str, Path]) -> StudyData:
-    """Deserialize study and series data from JSON to `StudyData`.
-
-    Args:
-        filepath (Union[str, Path]): Path to .json file.
-
-    Returns:
-        study_data (StudyData): Deserialized `StudyData` dataclass object.
-    """
-    with open(filepath, "r") as file:
-        data = json.load(file)
-        series_dict: dict[str, Any] = data.pop("series")
-        return StudyData(
-            **data, series={key: SeriesData(**val) for key, val in series_dict.items()}
-        )
-
-
-def get_series_tags(df_tags: pd.DataFrame, series_inst_uid: str):
-    return df_tags.loc[df_tags["series_inst_uid"] == series_inst_uid].iloc[0].to_dict()
-
-
-def read_volume(path: Union[Path, str]):
+def read_volume(path: Path | str):
     volume = nib.as_closest_canonical(nib.load(path))
     spacing = volume.header.get_zooms()
-    return ImageData(image=volume, spacing=spacing, path=path)
+    return ImageData(image=volume, spacing=spacing, path=Path(path))
 
 
-def remove_empty_segmentation_dir(dirpath: Union[str, Path]):
+def remove_empty_segmentation_dir(dirpath: str | Path):
     logger.info(f"removing empty segmentation directory `{dirpath}`")
     shutil.rmtree(dirpath)
 
 
-def remove_dicom_dir(dirpath: Union[str, Path]):
+def remove_dicom_dir(dirpath: str | Path):
     logger.info(f"removing input DICOM directory `{dirpath}`")
     shutil.rmtree(dirpath)
 
 
 def make_report(
-    requested_study_cases: list[LabkeyRow],
+    requested_study_cases: list[StudyData],
     output_dir: Path,
-    timestamp: str = None,
+    timestamp: str | None = None,
     verbose: bool = False,
 ):
     if not timestamp:
@@ -379,45 +281,31 @@ def make_report(
 
     study_dirs = list(output_dir.glob("*"))
     missing_studies = [
-        f"{pat.participant}, {pat.study_instance_uid}"
+        {"participant": pat.participant, "study_instance_uid": pat.study_inst_uid}
         for pat in requested_study_cases
-        if output_dir.joinpath(pat.study_instance_uid) not in study_dirs
+        if output_dir.joinpath(pat.study_inst_uid) not in study_dirs
     ]
 
-    finished_studies = []
-    for pat in requested_study_cases:
-        study = output_dir.joinpath(pat.study_instance_uid)
-        preproc = len(list(study.rglob("input_ct_volume.nii.gz")))
-        segment = len(list(study.rglob("tissue_mask_pp.nii.gz")))
+    finished_studies = [
+        {
+            "participant": pat.participant,
+            "study_inst_uid": pat.study_inst_uid,
+            "preprocessed_count": len(list(study_dir.rglob("input_ct_volume.nii.gz"))),
+            "segmentated_count": len(list(study_dir.rglob("tissue_mask.nii.gz"))),
+        }
+        for pat in requested_study_cases
+        if (study_dir := output_dir.joinpath(pat.study_inst_uid)).exists()
+    ]
 
-        if preproc or segment:
-            finished = (
-                f"{pat.participant} {pat.study_instance_uid}, {preproc}, {segment}"
-            )
-            finished_studies.append(finished)
+    report = {
+        "timestamp": timestamp,
+        "output_directory": str(output_dir.resolve()),
+        "finished_studies": finished_studies,
+        "missing_studies": missing_studies,
+    }
 
-    report = f"""Sarcoseg-aio segmentation report from {timestamp}
-Image and metric data saved in: {output_dir}
-
-Total number of requested studies: {len(requested_study_cases)}
-Total number of missing studies: {len(missing_studies)}
-
-Requested participant, Study Instance UID, # of preprocessed series, # of segmented series:
-{"\n".join(finished_studies)}
-
-Patient studies not found in output:
-{"\n".join(missing_studies)}
-"""
-
-    report_path = output_dir.joinpath(f"report_{timestamp}.txt")
+    report_path = output_dir.joinpath(f"report_{timestamp}.json")
     with open(report_path, "w") as file:
-        file.write(report)
+        json.dump(report, file, indent=4)
 
     logger.info(f"Segmentation report written to `{report_path}`")
-    logger.info(f"\n{report}")
-
-
-def read_json(path):
-    with open(path, "r") as f:
-        json_file = json.load(f)
-    return json_file

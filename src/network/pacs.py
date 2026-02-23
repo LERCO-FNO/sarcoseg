@@ -2,12 +2,13 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Self
 
 from pynetdicom.apps.echoscu import echoscu
 from pynetdicom.apps.movescu import movescu
 
 from src import slogger
-from src.utils import read_json
+from src.io import read_json
 
 logger = slogger.get_logger(__name__)
 
@@ -20,7 +21,7 @@ class PacsAPI:
         aet: str,
         aec: str,
         store_port: int,
-        aem: str = None,
+        aem: str | None = None,
     ):
         self.ip = ip
         self.port = port
@@ -97,7 +98,7 @@ class PacsAPI:
         return ret
 
     @classmethod
-    def init_from_json(cls, verbose: bool = False):
+    def init_from_json(cls, verbose: bool = False) -> Self:
         conf = read_json("./network.json")["pacs"]
 
         if verbose:
@@ -105,7 +106,7 @@ class PacsAPI:
 
         if not all(conf.values()):
             logger.error(f"some fields are missing values: {conf}")
-            return None
+            raise ValueError("Unable to initialize PACS API")
 
         return cls(
             conf["ip"],

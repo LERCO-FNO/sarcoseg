@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from src import preprocessing, segmentation, slogger, utils
+from src.classes import StudyData
 from src.network import database, pacs
 
 
@@ -45,7 +46,7 @@ def get_args():
     parser.add_argument(
         "--upload-labkey",
         action="store_true",
-        help="upload preprocessing and segmentation data to labkey",
+        help="upload preprocessing and segmentation results to labkey",
         default=False,
     )
     parser.add_argument(
@@ -59,14 +60,10 @@ def get_args():
 
 
 def main(args: argparse.Namespace):
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
     verbose = args.verbose
     main_logger = slogger.get_logger(__name__)
 
     participant_list = utils.read_patient_list(args.participant_list)
-    if participant_list is None:
-        sys.exit(-1)
 
     participant_list = participant_list.participant.to_list()
 
@@ -75,20 +72,19 @@ def main(args: argparse.Namespace):
         main_logger.critical("labkey is unreachable")
         sys.exit(-1)
 
-    # [TODO]: check for already finished/segmented studies, using Participant
     participant_list = labkey_api.exclude_finished_studies(participant_list)
 
-    queried_study_cases: list[database.LabkeyRow] = labkey_api._select_rows(
+    queried_study_cases: list[StudyData] = labkey_api._select_rows(
         schema_name="lists",
         query_name="RDG-CT-Sarko-All",
         columns=[
             "ID",
+            "PARTICIPANT",
             "RODNE_CISLO",
             "STUDY_INSTANCE_UID",
-            "VYSKA_PAC.",
-            "PARTICIPANT",
             "PACS_CISLO",
-        ],  # [TODO]: possibly add CAS_VYSETRENI
+            "VYSKA_PAC.",
+        ],  # TODO: possibly add CAS_VYSETRENI
         filter_dict={"PARTICIPANT": participant_list},
         sanitize_rows=True,
     )
@@ -100,14 +96,13 @@ def main(args: argparse.Namespace):
         sys.exit(-1)
 
     pacs_api = pacs.PacsAPI.init_from_json(verbose=verbose)
-    if pacs_api is None:
-        sys.exit(-1)
 
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_dir = Path(args.output_dir, timestamp)
     output_dir.mkdir(exist_ok=True)
 
-    for case_study in queried_study_cases:
-        input_study_dir = Path(args.input_dir, case_study.study_instance_uid)
+    for study_case in queried_study_cases:
+        input_study_dir = Path(args.input_dir, study_case.study_inst_uid)
 
         if not input_study_dir.exists() and list(input_study_dir.rglob("*")) != 0:
             main_logger.info(
@@ -115,58 +110,55 @@ def main(args: argparse.Namespace):
             )
 
             status = pacs_api._movescu(
-                case_study.study_instance_uid,
+                study_case.study_inst_uid,
                 input_study_dir,
             )
 
             if status == -1:
                 continue
 
-        output_study_dir = Path(output_dir, case_study.study_instance_uid)
+        output_study_dir = Path(output_dir, study_case.study_inst_uid)
 
         main_logger.info(
-            f"preprocessing study {case_study.study_instance_uid} patient {case_study.participant}"
+            f"preprocessing study {study_case.study_inst_uid} participant {study_case.participant}"
         )
-        study_data = preprocessing.preprocess_dicom_study(
+        preprocessing.preprocess_dicom_study(
             input_study_dir,
             output_study_dir,
-            case_study,
+            study_case,
         )
 
-        if not study_data.series:
+        if not study_case.series:
             main_logger.warning(
-                f"participant {study_data.participant} study {study_data.study_inst_uid} has no series to segment"
+                f"participant {study_case.participant} study {study_case.study_inst_uid} has no series to segment"
             )
             continue
 
         main_logger.info(
-            f"segmenting study {case_study.study_instance_uid} for patient {case_study.participant}"
+            f"segmenting study {study_case.study_inst_uid} for patient {study_case.participant}"
         )
-        metrics_results = segmentation.segment_ct_study(
+        segmentation_result = segmentation.segment_ct_study(
             output_study_dir,
             output_study_dir,
+            study_case=study_case,
             save_mask_overlays=True,
-            study_case=study_data,
         )
 
-        print(metrics_results)
+        print(segmentation_result)
 
         if args.upload_labkey:
-            # [TODO]: send dicom data to labkey
-            # [TESTME]:
+            # TEST:
             labkey_api._upload_data(
                 schema_name="lists",
                 query_name="CTVysetreni",
-                rows=study_data._to_list_of_dicts(),
+                rows=study_case._to_list_of_dicts(),
             )
 
-            # [TODO]: send segmentation data to labkey
-            # [TESTME]:
-            metrics_data = [d._to_dict() for d in metrics_results]
+            # TEST:
             labkey_api._upload_data(
                 schema_name="lists",
                 query_name="CTSegmentationData",
-                rows=metrics_data,
+                rows=segmentation_result._to_list_of_dicts(),
             )
 
         if args.remove_dicom_files:

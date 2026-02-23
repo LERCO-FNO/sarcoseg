@@ -3,8 +3,9 @@ from pathlib import Path
 
 import numpy as np
 
-from src import segmentation, visualization, utils
+from src import segmentation, utils, visualization
 from src.classes import Centroids, MetricsData, SegmentationResult
+
 
 class TestSegmentation(unittest.TestCase):
     def test_study_segment(self):
@@ -29,11 +30,14 @@ class TestSegmentation(unittest.TestCase):
         pass
 
     def test_compute_metrics(self):
-        tissue_volume = utils.read_volume("tests\\output\\1.3.6.1.4.1.36302.1.1.2.67386.4681372\\1.3.12.2.1107.5.1.4.75968.30000025063005325811100017182\\tissue_slices.nii.gz")
-        tissue_mask = utils.read_volume("tests\\output\\1.3.6.1.4.1.36302.1.1.2.67386.4681372\\1.3.12.2.1107.5.1.4.75968.30000025063005325811100017182\\tissue_mask.nii.gz")
+        tissue_volume = utils.read_volume(
+            "tests\\output\\1.3.6.1.4.1.36302.1.1.2.67386.4681372\\1.3.12.2.1107.5.1.4.75968.30000025063005325811100017182\\tissue_slices.nii.gz"
+        )
+        tissue_mask = utils.read_volume(
+            "tests\\output\\1.3.6.1.4.1.36302.1.1.2.67386.4681372\\1.3.12.2.1107.5.1.4.75968.30000025063005325811100017182\\tissue_mask.nii.gz"
+        )
 
-        
-        metrics = utils.compute_metrics(tissue_mask, tissue_volume, 170.)
+        metrics = utils.compute_metrics(tissue_mask, tissue_volume, 170.0)
         print(metrics)
 
     def test_mask_overlays(self):
@@ -42,15 +46,17 @@ class TestSegmentation(unittest.TestCase):
     def test_metrics_patient_data(self):
         output_dir = Path("tests/output/1.3.6.1.4.1.36302.1.1.2.67388.4692994")
 
-        seg_result = SegmentationResult("PAT1", output_dir.name, 170.0)
+        seg_result = SegmentationResult(
+            participant="PAT1", study_inst_uid=output_dir.name, patient_height=170.0
+        )
 
         all_metrics = {
             "1.2.1": MetricsData(
-                series_inst_uid="1.2.1",
-                contrast_phase="venous",
                 area={"sat": 200.0, "muscle": 210.0},
                 mean_hu={"sat": -97.0},
                 skelet_muscle_index=28.0,
+                series_inst_uid="1.2.1",
+                contrast_phase="venous",
                 duration=35.0,
                 centroids=Centroids(
                     vertebre_centroid=np.array([0, 0, 417]).tolist(),
@@ -58,11 +64,11 @@ class TestSegmentation(unittest.TestCase):
                 ),
             ),
             "1.2.2": MetricsData(
-                series_inst_uid="1.2.2",
-                contrast_phase="arterial",
                 area={"sat": 100.0},
                 mean_hu={"sat": -80.0},
                 skelet_muscle_index=40.0,
+                series_inst_uid="1.2.2",
+                contrast_phase="arterial",
                 duration=40.0,
                 centroids=Centroids(
                     vertebre_centroid=np.array([0, 0, 500]).tolist(),

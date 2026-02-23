@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from src import preprocessing
-from src.classes import LabkeyRow, SeriesData, StudyData
+from src.classes import SeriesData, StudyData
 
 
 class TestPreprocessDicom(unittest.TestCase):
@@ -28,12 +28,13 @@ class TestPreprocessDicom(unittest.TestCase):
 
         input_path = Path("tests/input/", true_uid)
         output_path = Path("tests/output/", true_uid)
-        row = LabkeyRow(true_participant, patient_height=170.0)
+        row = StudyData(true_participant, study_inst_uid=true_uid, patient_height=170.0)
 
-        test_study_data = preprocessing.preprocess_dicom_study(
-            input_path, output_path, labkey_case=row
+        preprocessing.preprocess_dicom_study(input_path, output_path, study_case=row)
+
+        test_study_data = StudyData._from_json(
+            output_path.joinpath(f"dicom_tags_{true_uid}.json")
         )
-
         self.assertEqual(test_study_data.participant, true_participant)
         self.assertEqual(test_study_data.study_inst_uid, true_uid)
 

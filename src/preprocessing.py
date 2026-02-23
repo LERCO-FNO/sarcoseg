@@ -1,18 +1,13 @@
 import re
 import shutil
-import sys
-from datetime import datetime
 from pathlib import Path
 from statistics import mean
-from typing import Any, Union
 
 import dcm2niix
-import pandas as pd
 import pydicom
 
 from src import slogger
 from src.classes import SeriesData, StudyData
-from src.network.database import LabkeyRow
 
 logger = slogger.get_logger(__name__)
 
@@ -37,10 +32,8 @@ CONTRAST_PHASES_PATTERN = re.compile(
 
 
 def preprocess_dicom_study(
-    input_dir: Union[str, Path],
-    output_dir: Union[str, Path] = Path("./inputs"),
-    labkey_case: LabkeyRow | None = None,
-) -> Union[StudyData, None]:
+    input_dir: str | Path, output_dir: str | Path, study_case: StudyData
+) -> None:
     if isinstance(input_dir, str):
         input_dir = Path(input_dir)
 
@@ -53,13 +46,13 @@ def preprocess_dicom_study(
         logger.error(f"no DICOM files found in `{input_dir}`")
         return None
 
-    study_data = StudyData._from_dicom_file(labkey_case, dicom_files[0])
-
-    if labkey_case:
-        study_data.patient_height = labkey_case.patient_height
+    # TODO maybe add verify_dicom_study(), remove if no
+    # if not verify_dicom_study(study_case.study_inst_uid, dicom_files[0]):
+    #     logger.error("requested study ")
+    #     return
 
     logger.info(
-        f"preprocessing DICOM files for participant {study_data.participant}, study {study_data.study_inst_uid}"
+        f"preprocessing DICOM files for participant {study_case.participant}, study {study_case.study_inst_uid}"
     )
 
     series_files_map, dose_report_path = filter_dicom_files(dicom_files)
@@ -68,22 +61,20 @@ def preprocess_dicom_study(
     if dose_report_path:
         event_dose_map = extract_dose_values(dose_report_path)
 
-    study_data.series = select_series_to_segment(
+    study_case.series = select_series_to_segment(
         series_files_map, event_dose_map=event_dose_map
     )
 
-    logger.info(f"found {len(study_data.series)} valid series for segmentation")
+    logger.info(f"found {len(study_case.series)} valid series for segmentation")
 
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    study_data._write_to_json(output_dir)
+    study_case._write_to_json(output_dir)
 
-    for series_data in study_data.series.values():
+    for series_data in study_case.series.values():
         write_series_as_nifti(output_dir, series_data)
 
     logger.info("-" * 25)
-
-    return study_data
 
 
 def write_series_as_nifti(output_study_dir: Path, series_data: SeriesData):
@@ -191,7 +182,7 @@ def filter_dicom_files(
 def select_series_to_segment(
     series_files_map: dict[str, list[Path]],
     event_dose_map: dict[str, dict[str, float]] | None,
-) -> list[SeriesData]:
+) -> dict[str, SeriesData]:
     """
     Return one or more CT series with lowest slice thickness and highest file count based on contrast phase type:
         - abdomen (ie. native, no constrast phase), arterial, venous, nephrous.
@@ -201,7 +192,7 @@ def select_series_to_segment(
         event_dose_map (dict[str, dict[str, float]]): Mapping of `IrradiationEventUID` to dose values.
 
     Returns:
-        series_list (list[SeriesData]): List of series selected for segmentation.
+        series_list (dict[str, SeriesData]): List of series selected for segmentation.
     """
 
     series_by_contrast: dict[str, list[SeriesData]] = {}
@@ -227,8 +218,7 @@ def select_series_to_segment(
             convolution_kernel=convolution_kernel[0] if convolution_kernel else "n/a",
         )
 
-        contrast_match = CONTRAST_PHASES_PATTERN.search(series_desc)
-        if contrast_match:
+        if contrast_match := CONTRAST_PHASES_PATTERN.search(series_desc):
             series_data.contrast_phase = contrast_match.group().lower()
         else:
             series_data.contrast_phase = "other"
@@ -274,7 +264,7 @@ def select_series_to_segment(
     return {series.series_inst_uid: series for series in selected_series.values()}
 
 
-def extract_dose_values(dose_filepath: Union[str, Path]) -> dict[str, dict[str, float]]:
+def extract_dose_values(dose_filepath: str | Path) -> dict[str, dict[str, float]]:
     """
     Maps IrradiationEventUID to a map of dose values:
         - EventUID1
@@ -333,7 +323,7 @@ def extract_dose_values(dose_filepath: Union[str, Path]) -> dict[str, dict[str, 
     return event_to_dose
 
 
-def find_dicoms(dicom_dir: Path) -> Union[list[Path], None]:
+def find_dicoms(dicom_dir: Path) -> list[Path] | None:
     """
     Returns DICOM files excluding DICOMDIR file.
 
@@ -352,92 +342,3 @@ def find_dicoms(dicom_dir: Path) -> Union[list[Path], None]:
         if not paths:
             return None
         return paths
-
-
-# [REMOVE]: remove before merge
-def write_dicom_tags(
-    study_dir: Path, study: StudyData, labkey_data: LabkeyRow | None = None
-):
-    logger.info(
-        f"saving DICOM tags for participant {study.participant}, study instance uid {study.study_inst_uid}"
-    )
-    rows: list[dict[str, Any]] = []
-    for series in study.series:
-        row = {
-            # "patient_id": study.patient_id,
-            "participant": study.participant,
-            "study_inst_uid": study.study_inst_uid,
-            "study_date": study.study_date,
-            "series_inst_uid": series.series_inst_uid,
-            "series_description": series.description,
-            "slice_thickness": series.slice_thickness,
-            "has_contrast": series.has_contrast,
-            "contrast_phase": series.contrast_phase,
-            "kilo_voltage_peak": series.kilo_voltage_peak,
-            "mean_tube_current": series.mean_tube_current,
-            "mean_ctdi_vol": series.mean_ctdi_vol,
-            "dose_length_product": series.dose_length_product,
-        }
-        if labkey_data:
-            # row["participant"] = labkey_data.participant
-            row["vyska_pac."] = labkey_data.patient_height
-
-        rows.append(row)
-
-    df = pd.DataFrame(rows, columns=rows[0].keys())
-    filepath = study_dir.joinpath(f"dicom_tags_{study.study_inst_uid}.csv")
-
-    if filepath.exists():
-        logger.info(f"overwriting existing dicom_tags.csv at `{str(filepath)}`")
-
-    df.to_csv(
-        filepath,
-        sep=",",
-        na_rep="nan",
-        index=False,
-        columns=df.columns.to_list(),
-    )
-    logger.info(
-        f"DICOM tags for {study.participant}, study instance uid {study.study_inst_uid} written to `{filepath}`"
-    )
-
-
-def collect_all_dicom_tags(
-    input_dir: Union[str, Path],
-    output_dir: Union[str, Path],
-    write_to_csv: bool = False,
-) -> pd.DataFrame:
-    if isinstance(input_dir, str):
-        input_dir = Path(input_dir)
-
-    if isinstance(output_dir, str):
-        output_dir = Path(output_dir)
-
-    dicom_tags_files = list(input_dir.rglob("dicom_tags.*"))
-    df = pd.concat(
-        (pd.read_csv(file, index_col=None, header=0) for file in dicom_tags_files),
-        axis=0,
-        ignore_index=True,
-    )
-
-    logger.info(
-        f"collected DICOM tags of {len(df.study_inst_uid.unique())} studies ({len(df.series_inst_uid.unique())} series)"
-    )
-    if write_to_csv:
-        filepath = Path(
-            output_dir if output_dir else input_dir,
-            f"all_dicom_tags_{datetime.now().strftime('%d-%m-%Y_%H-%M-%S')}.csv",
-        )
-        df.to_csv(
-            filepath, sep=",", na_rep="nan", index=False, columns=df.columns.to_list()
-        )
-        logger.info(f"DICOM tags written to `{filepath}`")
-
-    return df
-
-
-if __name__ == "__main__":
-    if len(sys.argv) < 1:
-        logger.critical("Missing input directory")
-        sys.exit(-1)
-    preprocess_dicom_study(sys.argv[1])
