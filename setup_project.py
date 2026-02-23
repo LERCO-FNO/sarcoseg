@@ -1,10 +1,10 @@
 import argparse
 import json
+import os
 from pathlib import Path
 
-# REMOVE in future for nnunetv2 branch
-# from zipfile import ZipFile
-# import huggingface_hub as hf
+from zipfile import ZipFile
+import huggingface_hub as hf
 from totalsegmentator.python_api import download_pretrained_weights
 
 from src.slogger import get_logger
@@ -17,9 +17,9 @@ def setup_project(
     output_dir: str = "./outputs",
     remove_model_zip: bool = False,
 ):
-    # model_dir = "./models"
-    # model_name = "muscle_fat_tissue_0_0_2"
-    #
+    model_dir = "./models"
+    model_name = "muscle_fat_tissue_0_0_2"
+
     project_dir = Path().resolve()
     for d in (input_dir, output_dir, "./models"):
         d = Path(project_dir, d)
@@ -30,7 +30,7 @@ def setup_project(
         logger.info(f"created directory {d}")
     logger.info("available models for download in src/models.json")
 
-    conf_file = project_dir / "network.json"
+    conf_file = project_dir.joinpath("src", "network", "network.json")
 
     # TODO: improve serialization/deserialization in future
     if not conf_file.exists():
@@ -54,28 +54,28 @@ def setup_project(
     else:
         logger.warning(f"network configuration file `{conf_file}` already exists")
 
-    # download_models(project_dir)
+    model_path = Path(model_dir, model_name)
 
-    # model_path = Path(model_dir, model_name)
+    model_repo = "stanfordmimi/multilevel_muscle_adipose_tissue"
+    logger.info(
+        f"downloading zipped model {model_name} from huggingface repo {model_repo}"
+    )
 
-    # model_repo = "stanfordmimi/multilevel_muscle_adipose_tissue"
-    # print(f"downloading zipped model {model_name} from huggingface repo {model_repo}")
+    model_path.mkdir(exist_ok=True)
+    zip_filepath = hf.hf_hub_download(
+        repo_id=model_repo, filename="all.zip", local_dir=model_path, repo_type="model"
+    )
 
-    # model_path.mkdir(exist_ok=True)
-    # zip_filepath = hf.hf_hub_download(
-    #     repo_id=model_repo, filename="all.zip", local_dir=model_path, repo_type="model"
-    # )
+    if not model_path.joinpath("model_final_checkpoint.model").exists():
+        with ZipFile(zip_filepath) as zipf:
+            zipf.extractall(model_path)
+            logger.info(f"unzipped model to {model_path}")
 
-    # if not model_path.joinpath("model_final_checkpoint.model").exists():
-    #     with ZipFile(zip_filepath) as zipf:
-    #         zipf.extractall(model_path)
-    #         print(f"unzipped model to {model_path}")
-
-    #     if remove_model_zip:
-    #         os.remove(zip_filepath)
-    #         print(f"removed zip file {zip_filepath}")
-    # else:
-    #     print(f"muscle_adipose_tissue model exists at `{model_path}`")
+        if remove_model_zip:
+            os.remove(zip_filepath)
+            logger.info(f"removed zip file {zip_filepath}")
+    else:
+        logger.warning(f"muscle_adipose_tissue model exists at `{model_path}`")
 
     """
     TotalSegmentator task ids:
