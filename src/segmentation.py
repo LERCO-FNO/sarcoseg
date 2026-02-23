@@ -1,9 +1,14 @@
+from nnunet.evaluation.model_selection.collect_all_fold0_results_and_summarize_in_one_csv import (
+    folds,
+)
+from nnunet.training.cascade_stuff.predict_next_stage import fold
 import subprocess
 from pathlib import Path
 from time import perf_counter
 
 import nibabel as nib
 from nibabel import Nifti1Image
+from nnunet.inference.predict import predict_cases
 
 from src import utils
 from src.utils import DEFAULT_VERTEBRA_CLASSES
@@ -186,15 +191,19 @@ def segment_tissues(
     output_filepath = Path(case_output_dir, "tissue_mask.nii.gz")
     print(f"{tissue_volume_path=}")
     start = perf_counter()
-    try:
-        tissue_predictor.predict_from_files(
-            list_of_lists_or_source_folder=[[str(tissue_volume_path)]],
-            output_folder_or_list_of_truncated_output_files=[str(output_filepath)],
-            num_processes_preprocessing=8,
-            num_processes_segmentation_export=8,
-        )
-    except RuntimeError:
-        logger.info(f"nnUNet finished `{tissue_volume_path}`")
+    predict_cases(
+        model=str(MODEL_DIR),
+        list_of_lists=[[tissue_volume_path]],
+        output_filenames=[output_filepath],
+        folds="all",
+        save_npz=False,
+        num_threads_preprocessing=8,
+        num_threads_nifti_save=8,
+        do_tta=False,
+        overwrite_existing=True,
+        step_size=0.5,
+        disable_postprocessing=True,
+    )
 
     duration = perf_counter() - start
     logger.info(f"tissue segmentation finished in {duration}")
