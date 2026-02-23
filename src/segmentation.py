@@ -1,7 +1,3 @@
-from nnunet.evaluation.model_selection.collect_all_fold0_results_and_summarize_in_one_csv import (
-    folds,
-)
-from nnunet.training.cascade_stuff.predict_next_stage import fold
 import subprocess
 from pathlib import Path
 from time import perf_counter
