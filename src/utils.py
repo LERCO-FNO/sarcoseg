@@ -3,7 +3,6 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
-from typing import Any
 
 import nibabel as nib
 import numpy as np
@@ -17,7 +16,6 @@ from src import slogger
 from src.classes import (
     ImageData,
     MetricsData,
-    SeriesData,
     StudyData,
 )
 
