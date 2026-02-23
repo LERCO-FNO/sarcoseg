@@ -33,7 +33,7 @@ def segment_ct_study(
     output_dir = Path(output_dir)
 
     if not study_case:
-        study_case = utils.read_study_case(
+        study_case = StudyData._from_json(
             input_dir.joinpath(f"dicom_tags_{input_dir.name}.json")
         )
 
