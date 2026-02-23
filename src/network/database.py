@@ -6,7 +6,7 @@ from labkey.query import QueryFilter
 
 from src import slogger
 from src.classes import StudyData
-from src.utils import read_json
+from src.io import read_json
 
 logger = slogger.get_logger(__name__)
 
@@ -139,7 +139,7 @@ class LabkeyAPI(APIWrapper):
         if not rows:
             return input_participants
 
-        finished_studies = set([row["PARTICIPANT"] for row in rows])
+        finished_studies = set([row.participant for row in rows])
         logger.info(
             f"excluding {len(finished_studies)} participants due to existing segmentation results"
         )

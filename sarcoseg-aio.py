@@ -46,7 +46,7 @@ def get_args():
     parser.add_argument(
         "--upload-labkey",
         action="store_true",
-        help="upload preprocessing and segmentation data to labkey",
+        help="upload preprocessing and segmentation results to labkey",
         default=False,
     )
     parser.add_argument(
@@ -60,14 +60,10 @@ def get_args():
 
 
 def main(args: argparse.Namespace):
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
     verbose = args.verbose
     main_logger = slogger.get_logger(__name__)
 
     participant_list = utils.read_patient_list(args.participant_list)
-    if participant_list is None:
-        sys.exit(-1)
 
     participant_list = participant_list.participant.to_list()
 
@@ -76,7 +72,6 @@ def main(args: argparse.Namespace):
         main_logger.critical("labkey is unreachable")
         sys.exit(-1)
 
-    # [TODO]: check for already finished/segmented studies, using Participant
     participant_list = labkey_api.exclude_finished_studies(participant_list)
 
     queried_study_cases: list[StudyData] = labkey_api._select_rows(
@@ -89,7 +84,7 @@ def main(args: argparse.Namespace):
             "STUDY_INSTANCE_UID",
             "PACS_CISLO",
             "VYSKA_PAC.",
-        ],  # [TODO]: possibly add CAS_VYSETRENI
+        ],  # TODO: possibly add CAS_VYSETRENI
         filter_dict={"PARTICIPANT": participant_list},
         sanitize_rows=True,
     )
@@ -102,6 +97,7 @@ def main(args: argparse.Namespace):
 
     pacs_api = pacs.PacsAPI.init_from_json(verbose=verbose)
 
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     output_dir = Path(args.output_dir, timestamp)
     output_dir.mkdir(exist_ok=True)
 
@@ -141,17 +137,16 @@ def main(args: argparse.Namespace):
         main_logger.info(
             f"segmenting study {study_case.study_inst_uid} for patient {study_case.participant}"
         )
-        metrics_results = segmentation.segment_ct_study(
+        segmentation_result = segmentation.segment_ct_study(
             output_study_dir,
             output_study_dir,
             study_case=study_case,
             save_mask_overlays=True,
         )
 
-        print(metrics_results)
+        print(segmentation_result)
 
         if args.upload_labkey:
-            # TODO: send dicom data to labkey
             # TEST:
             labkey_api._upload_data(
                 schema_name="lists",
@@ -159,13 +154,11 @@ def main(args: argparse.Namespace):
                 rows=study_case._to_list_of_dicts(),
             )
 
-            # TODO: send segmentation data to labkey
             # TEST:
-            metrics_data = [d._to_dict() for d in metrics_results]
             labkey_api._upload_data(
                 schema_name="lists",
                 query_name="CTSegmentationData",
-                rows=metrics_data,
+                rows=segmentation_result._to_list_of_dicts(),
             )
 
         if args.remove_dicom_files:

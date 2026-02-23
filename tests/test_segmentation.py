@@ -46,7 +46,9 @@ class TestSegmentation(unittest.TestCase):
     def test_metrics_patient_data(self):
         output_dir = Path("tests/output/1.3.6.1.4.1.36302.1.1.2.67388.4692994")
 
-        seg_result = SegmentationResult("PAT1", output_dir.name, 170.0)
+        seg_result = SegmentationResult(
+            participant="PAT1", study_inst_uid=output_dir.name, patient_height=170.0
+        )
 
         all_metrics = {
             "1.2.1": MetricsData(

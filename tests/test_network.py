@@ -3,7 +3,7 @@ from pathlib import Path
 
 from src.classes import StudyData
 from src.network import database, pacs
-from src.utils import read_json
+from src.io import read_json
 
 
 class TestPacs(unittest.TestCase):

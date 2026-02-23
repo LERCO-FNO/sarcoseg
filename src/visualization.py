@@ -33,7 +33,7 @@ RAS_TO_LPI = np.array([[0.0, -1.0], [1.0, -1.0], [2.0, -1.0]])  # from RAS to LP
 def overlay_spine_mask(
     ct_volume: Nifti1Image,
     spine_mask: Nifti1Image,
-    vert_body_centroid: NDArray,
+    vert_body_centroid: NDArray | list,
     output_dir: Path,
 ):
     coronal = [

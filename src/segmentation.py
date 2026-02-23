@@ -3,15 +3,17 @@ from pathlib import Path
 from time import perf_counter
 
 import nibabel as nib
-import pandas as pd
+from nibabel import Nifti1Image
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
-from numpy import nan
 
-from src import slogger, utils, visualization
-from src.classes import ImageData, MetricsData, SegmentationResult, StudyData
+from src import utils
 from src.utils import DEFAULT_VERTEBRA_CLASSES
+from src import visualization
+from src.slogger import get_logger
+from src.classes import ImageData, SegmentationResult, StudyData, Centroids
 
-logger = slogger.get_logger(__name__)
+
+logger = get_logger(__name__)
 
 MODEL_DIR = Path("models", "muscle_fat_tissue_stanford_0_0_2")
 
@@ -58,7 +60,7 @@ def segment_ct_study(
             series_filepath, series_output_dir
         )
 
-        tissue_volume_data, centroids, extraction_duration = utils.extract_slices(
+        tissue_volume_data, centroids, extraction_duration = extract_slices(
             input_volume_data.image,
             spine_mask_data.image,
             series_output_dir,
@@ -69,13 +71,13 @@ def segment_ct_study(
             tissue_volume_data.path, series_output_dir
         )
 
-        # [TODO] check this and verify if it should be used
+        # TODO check this and verify if it should be used
         processed_data, postproc_duration = utils.postprocess_tissue_masks(
             tissue_mask_data,
             tissue_volume_data,
         )
 
-        # [TODO] maybe replace skimage with simpleitk?
+        # TODO maybe replace skimage with simpleitk?
         metrics = utils.compute_metrics(
             processed_data,
             tissue_volume_data,
@@ -202,39 +204,95 @@ def segment_tissues(
     return tissue_mask, duration
 
 
-def write_metric_results(metric_results: list[MetricsData], output_study_dir: Path):
-    df = pd.DataFrame([result._to_dict() for result in metric_results])
-    filepath = output_study_dir.joinpath(f"metric_results_{output_study_dir.name}.csv")
-    if filepath.exists():
-        logger.info(f"overwriting existing metric_results.csv at `{filepath}`")
-    df.to_csv(filepath, sep=",", na_rep=nan, columns=df.columns, index=None)
+def extract_slices(
+    ct_volume: Nifti1Image | Path | str,
+    spine_mask: Nifti1Image | Path | str,
+    output_dir: Path | str,
+    slices_num: int = 0,
+) -> tuple[ImageData, Centroids, float]:
+    """
+    Extract axial slices from input CT volume at vertebrae body's centroid.
 
+    Args:
+        ct_volume (Union[Nifti1Image, Path, str]): Input CT volume.
+        spine_mask (Union[Nifti1Image, Path, str]): Segmented spine mask with labeled vertebrae.
+        output_dir (Union[Path, str]): directory to save extracted slices data.
+        slices_num (int, optional): Number of slices to extract. Defaults to 0. If slicing range extends CT volume size, it will be clipped to volume's size.
 
-# [TODO]: check this and if it needs to be used
-# maybe use it as a ArgumentParser command
-def collect_all_metric_results(
-    input_dir: str | Path, write_to_csv: bool = False
-) -> pd.DataFrame:
-    if isinstance(input_dir, str):
-        input_dir = Path(input_dir)
+    Raises:
+        FileNotFoundError: If input CT volume is not found.
+        FileNotFoundError: If segmented spine mask is not found.
 
-    metrics_files = list(input_dir.rglob("metric_results_*.csv"))
-    df = pd.concat(
-        (
-            pd.read_csv(file, index_col=None, header=0, dtype={"patient_id": str})
-            for file in metrics_files
-        ),
-        axis=0,
-        ignore_index=True,
+    Returns:
+
+    """
+    if not isinstance(spine_mask, Nifti1Image):
+        if Path(spine_mask).exists():
+            spine_mask = nib.as_closest_canonical(nib.load(spine_mask))
+        else:
+            raise FileNotFoundError(spine_mask)
+
+    if not isinstance(ct_volume, Nifti1Image):
+        if Path(ct_volume).exists():
+            ct_volume = nib.as_closest_canonical(nib.load(ct_volume))
+        else:
+            raise FileNotFoundError(ct_volume)
+
+    start = perf_counter()
+    body_centroid, vert_centroid = utils.get_vertebrae_body_centroids(
+        spine_mask, DEFAULT_VERTEBRA_CLASSES["vertebrae_L3"]
     )
+
+    # requires slices_num=2 at minimum
+    if slices_num >= 2:
+        slices_range = [
+            # extract slices in Z direction (superior-inferior)
+            body_centroid[-1] - (slices_num // 2),
+            body_centroid[-1] + (slices_num // 2),
+        ]
+    else:
+        slices_range = [body_centroid[-1], body_centroid[-1]]
+
+    slices_range[-1] += 1  # nibabel slicer requires range [..., i:i + 1]
+
+    if slices_range[0] < 0:
+        slices_range[0] = 0
+        logger.info(
+            f"lower index {slices_range[0]} is outside lower extent for Z dimension, setting to 0"
+        )
+
+    z_size = ct_volume.shape[-1]
+    if slices_range[1] > z_size:
+        slices_range[1] = z_size
+        slices_range[0] -= 1
+        logger.info(
+            f"upper index {slices_range[1]} is outside upper extent for Z dimension {z_size}, setting to {z_size}"
+        )
 
     logger.info(
-        f"collected metric results of {len(df.study_inst_uid.unique())} studies ({len(df.series_inst_uid.unique())} series)"
+        f"extracting {slices_range[1] - slices_range[0]} slices in range {slices_range}"
     )
 
-    if write_to_csv:
-        filepath = Path(input_dir, "all_metric_results.csv")
-        df.to_csv(filepath, sep=",", na_rep=nan, index=None, columns=df.columns)
-        logger.info(f"written results to `{filepath}`")
+    sliced_volume = ct_volume.slicer[..., slices_range[0] : slices_range[1]]
+    sliced_volume = nib.as_closest_canonical(sliced_volume)
 
-    return df
+    output_filepath = Path(output_dir, "tissue_slices.nii.gz")
+    if output_filepath.exists():
+        logger.info(f"file `{output_filepath}` exists, overwriting")
+
+    try:
+        nib.save(sliced_volume, output_filepath)
+    except RuntimeError as err:
+        logger.error(err)
+
+    duration = perf_counter() - start
+    logger.info(f"slice extraction finished in {duration} seconds")
+
+    return (
+        ImageData(image=sliced_volume, path=output_filepath),
+        Centroids(
+            vertebre_centroid=vert_centroid.tolist(),
+            body_centroid=body_centroid.tolist(),
+        ),
+        duration,
+    )

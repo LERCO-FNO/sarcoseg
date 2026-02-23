@@ -8,7 +8,7 @@ from pynetdicom.apps.echoscu import echoscu
 from pynetdicom.apps.movescu import movescu
 
 from src import slogger
-from src.utils import read_json
+from src.io import read_json
 
 logger = slogger.get_logger(__name__)
 
