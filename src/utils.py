@@ -31,10 +31,10 @@ DEFAULT_VERTEBRA_CLASSES: dict[str, int] = {
 }
 
 DEFAULT_TISSUE_CLASSES: dict[str, int] = {
-    "sat": 2,
-    "vat": 3,
-    "imat": 4,
-    "muscle": 1,
+    "sat": 1,
+    "vat": 2,
+    "imat": 3,
+    "muscle": 4,
 }
 
 TISSUE_LABEL_INDEX = list(DEFAULT_TISSUE_CLASSES.keys())
