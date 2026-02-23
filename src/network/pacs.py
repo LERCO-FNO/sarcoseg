@@ -99,7 +99,7 @@ class PacsAPI:
 
     @classmethod
     def init_from_json(cls, verbose: bool = False) -> Self:
-        conf = read_json("./network.json")["pacs"]
+        conf = read_json("./src/network/network.json")["pacs"]
 
         if verbose:
             logger.info(f"initializing PACS API with: {conf}")

@@ -15,9 +15,9 @@ class TestPacs(unittest.TestCase):
         self.assertEqual(ret.returncode, 0)
 
     def test_movescu(self):
-        self.STUDY_INST_UID = read_json("./network.json")["test_participant"].get(
-            "test_study_uid"
-        )
+        self.STUDY_INST_UID = read_json("./src/network/network.json")[
+            "test_participant"
+        ].get("test_study_uid")
         validate_study_uid(self.STUDY_INST_UID)
 
         if not self.STUDY_INST_UID:

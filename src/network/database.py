@@ -96,7 +96,7 @@ class LabkeyAPI(APIWrapper):
         return rows
 
     def sanitize_response_data(self, rows: list[dict]) -> list[StudyData]:
-        return [StudyData.from_labkey_row(row) for row in rows]
+        return [StudyData._from_labkey_row(row) for row in rows]
 
     def _upload_data(
         self, schema_name: str, query_name: str, rows: list, update_rows: bool = False
@@ -155,7 +155,7 @@ class LabkeyAPI(APIWrapper):
         Returns:
             api (LabkeyAPI): LabkeyAPI instance.
         """
-        conf = read_json("./network.json")["labkey"]
+        conf = read_json("./src/network/network.json")["labkey"]
 
         if verbose:
             logger.info(f"initializing Labkey API with: {conf}")
