@@ -30,7 +30,7 @@ response = labkey_api.query.select_rows(
 )
 
 raw_rows = [
-    {key: val for key, val in r.items() if key in columns}
+    {key: val for key, val in r.items() if key in columns} | {"StudyDescription": ""}
     for r in response.get("rows", None)
 ]
 print(f"returned rows {len(raw_rows)}")
@@ -68,9 +68,10 @@ for row in raw_rows:
     findscu.main(args)
 
     rsp_files = list(Path("./").glob("rsp*.dcm"))
-    row["StudyInstanceUID"] = [
-        dcmread(file).get("StudyInstanceUID") for file in rsp_files
-    ]
+    for file in rsp_files:
+        ds = dcmread(file)
+        row["StudyInstanceUID"] = ds.get("StudyInstanceUID")
+        row["StudyDescription"] = ds.get("StudyDescription")
 
 
 single_studies = [r for r in raw_rows if len(r["StudyInstanceUID"]) == 1]
