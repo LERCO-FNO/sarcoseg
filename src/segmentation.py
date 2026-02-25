@@ -15,7 +15,6 @@ from src.classes import ImageData, SegmentationResult, StudyData, Centroids
 
 logger = get_logger(__name__)
 
-MODEL_DIR = Path("models", "muscle_fat_tissue_stanford_0_0_2")
 
 tissue_predictor = nnUNetPredictor()
 tissue_predictor.initialize_from_trained_model_folder(
