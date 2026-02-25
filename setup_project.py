@@ -30,7 +30,7 @@ def setup_project(
         logger.info(f"created directory {d}")
     logger.info("available models for download in src/models.json")
 
-    conf_file = project_dir / "network.json"
+    conf_file = project_dir.joinpath("src", "network", "network.json")
 
     # TODO: improve serialization/deserialization in future
     if not conf_file.exists():
