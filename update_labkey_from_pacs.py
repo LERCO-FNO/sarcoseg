@@ -33,25 +33,6 @@ response = labkey_api.query.select_rows(
     filter_array=[QueryFilter("pacs_cislo", "", QueryFilter.Types.IS_BLANK)],
 )
 
-response = {
-    "rows": [
-        {
-            "PARTICIPANT": "PAT01",
-            "RODNE_CISLO": "15",
-            "CAS_VYSETRENI": "2025-06-30 00:00:00",
-            "PACS_CISLO": "",
-            "STUDY_INSTANCE_UID": "",
-        },
-        {
-            "PARTICIPANT": "PAT02",
-            "RODNE_CISLO": "024",
-            "CAS_VYSETRENI": "2016-05-11 00:00:00",
-            "PACS_CISLO": "",
-            "STUDY_INSTANCE_UID": "",
-        },
-    ]
-}
-
 if not response.get("rows", None):
     print("no rows returned from labkey")
     sys.exit(-1)
