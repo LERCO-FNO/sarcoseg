@@ -33,6 +33,18 @@ class SeriesData:
     def _from_dict(cls, series_data: dict[str, Any]) -> Self:
         return cls(**series_data)
 
+    def _to_dict(self, exclude_fields: list[str] | None = None) -> dict[str, Any]:
+        exclude = {"filepaths", "filepaths_num"}
+        if exclude_fields:
+            exclude.update(exclude_fields)
+
+        return asdict(
+            self,
+            dict_factory=lambda dic: {
+                key: val for key, val in dic if key not in exclude
+            },
+        )
+
 
 @dataclass
 class StudyData:
@@ -113,7 +125,7 @@ class StudyData:
             "study_date": self.study_date,
             "labkey_row_id": self.labkey_row_id,
         }
-        return [_study | series.__dict__ for series in self.series.values()]
+        return [_study | series._to_dict() for series in self.series.values()]
 
 
 @dataclass
