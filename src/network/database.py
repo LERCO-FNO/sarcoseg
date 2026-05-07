@@ -6,8 +6,6 @@ import requests
 from labkey.api_wrapper import APIWrapper
 from labkey.query import QueryFilter
 
-# from src import slogger
-from src.classes import StudyData
 from src.io import read_json
 
 log = logging.getLogger("database")
@@ -27,7 +25,6 @@ class LabkeyAPI(APIWrapper):
         api_key=None,
         disable_csrf=False,
         allow_redirects=False,
-        # debug=False,
     ):
         super().__init__(
             domain,
@@ -39,7 +36,6 @@ class LabkeyAPI(APIWrapper):
             disable_csrf,
             allow_redirects,
         )
-        # self.debug = debug
 
     def is_labkey_reachable(self):
         hostname = self.server_context.hostname
@@ -48,17 +44,11 @@ class LabkeyAPI(APIWrapper):
         try:
             response = requests.get(url=hostname, timeout=5)
             if response.status_code == 200:
-                # log.debug(f"{hostname} reachable: status {response.status_code}")
                 reachable = True
-            # else:
-            # log.debug(f"{hostname} unreachable")
-            # return False
             log.debug(f"{response.status_code}")
-
         except requests.exceptions.RequestException as e:
-            # log.critical(f"{hostname} unreachable")
             log.critical(f"{e.response}")
-            # reachable = False
+
         log.info(f"{hostname} reachable: {reachable}")
         return reachable
 
@@ -69,8 +59,7 @@ class LabkeyAPI(APIWrapper):
         columns: list[str] | str | None = None,
         max_rows: int = -1,
         filter_array: list[QueryFilter] | None = None,
-        sanitize_rows: bool = False,
-    ) -> list[dict[str, Any]]:  # list[StudyData]
+    ) -> list[dict[str, Any]]:
         log.info(
             f"labkey query, schema: {schema_name}, query: {query_name}, columns: {columns}"
         )
@@ -89,15 +78,10 @@ class LabkeyAPI(APIWrapper):
             log.warning(f"no returned rows from {query_name}")
             return []
 
-        # if sanitize_rows:
-        #     return self.sanitize_response_data(rows)
-        cols = [col["header"] for col in response.get("columnModel", [])]
+        cols = [col["dataIndex"] for col in response.get("columnModel", [])]
         return [
             {key: value for key, value in row.items() if key in cols} for row in rows
         ]
-
-    def sanitize_response_data(self, rows: list[dict]) -> list[StudyData]:
-        return [StudyData._from_labkey_row(row) for row in rows]
 
     def _insert_rows(
         self, schema_name: str, query_name: str, rows: list[dict[str, Any]]
