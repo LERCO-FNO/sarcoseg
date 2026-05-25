@@ -1,3 +1,4 @@
+from pydicom import dcmread
 import enum
 import json
 import logging
@@ -54,7 +55,9 @@ class StudyData:
     patient_id: str | None = field(default=None, repr=False, compare=False)
     study_date: str | None = field(default=None, repr=False, compare=False)
     patient_height: float | int | None = field(default=None, repr=False, compare=False)
+    patient_birthdate: str | None = field(default=None, repr=False, compare=False)
     series: dict[str, SeriesData] = field(default_factory=dict)
+    ct_relative_patient_age: int | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     def _from_labkey_row(cls, row: dict[str, Any]) -> Self:
@@ -65,6 +68,7 @@ class StudyData:
             patient_height=height
             if (height := row.get("VYSKA_PAC.", 0.0)) and height
             else 0.0,
+            patient_birthdate=row.get("CAS_VYSETRENI"),
         )
 
     @classmethod
@@ -125,8 +129,27 @@ class StudyData:
             "study_inst_uid": self.study_inst_uid,
             "patient_height": self.patient_height,
             "study_date": self.study_date,
+            "ct_relative_patient_age": self.ct_relative_patient_age,
         }
         return [_study | series._to_dict() for series in self.series.values()]
+
+    def calculate_ct_relative_patient_age(self, dicom_filepath: Path | str):
+        study_date = dcmread(dicom_filepath, specific_tags=["StudyDate"]).get(
+            "StudyDate", ""
+        )
+
+        # this shouldn't happen, but just in case
+        if not study_date:
+            log.error(
+                f"error parsing StudyDate `{study_date}` for patient {self.participant}, study {self.study_inst_uid}"
+            )
+            self.ct_relative_patient_age = -1
+            return None
+        ct_year = int(study_date[:4])  # parse year (YYYYMMDD) as int
+        birth_year = int(
+            self.patient_birthdate.split("-")[0]
+        )  # parse year (YYYY-MM-DD HH:MM:SS.SSS) as int
+        self.ct_relative_patient_age = ct_year - birth_year
 
 
 class ProcessResult(enum.Enum):

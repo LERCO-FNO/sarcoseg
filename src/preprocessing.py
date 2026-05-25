@@ -58,6 +58,9 @@ def preprocess_dicom_study(
         series_files_map, event_dose_map=event_dose_map
     )
 
+    # a single dicom file is enough for finding out the age
+    study_case.calculate_ct_relative_patient_age(list(series_files_map.values())[0][0])
+
     log.debug(f"found {len(study_case.series)} valid series for segmentation")
 
     output_dir.mkdir(exist_ok=True, parents=True)

@@ -97,7 +97,8 @@ def main(args: argparse.Namespace):
             "STUDY_INSTANCE_UID",
             "PACS_CISLO",
             "VYSKA_PAC.",
-        ],  # TODO: possibly add CAS_VYSETRENI
+            "CAS_VYSETRENI",
+        ],
         filter_array=[
             QueryFilter(
                 "PARTICIPANT",
