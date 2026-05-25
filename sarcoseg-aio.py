@@ -97,6 +97,7 @@ def main(args: argparse.Namespace):
             "STUDY_INSTANCE_UID",
             "PACS_CISLO",
             "VYSKA_PAC.",
+            "VAHA_PAC.",
             "CAS_VYSETRENI",
         ],
         filter_array=[
