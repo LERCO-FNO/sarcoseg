@@ -187,6 +187,7 @@ class Metrics:
     area: dict[str, Any] = field(default_factory=dict)
     mean_hu: dict[str, Any] = field(default_factory=dict)
     skelet_muscle_index: float | None = 0.0
+    body_mass_index: float | None = 0.0
 
     process_durations: ProcessDurations = field(default_factory=ProcessDurations)
     total_duration: float | None = 0.0
@@ -200,6 +201,7 @@ class Metrics:
         return (
             {
                 "skelet_muscle_index": self.skelet_muscle_index,
+                "body_mass_index": self.body_mass_index,
                 "total_duration": self.total_duration,
                 "L3_slice_index": self.l3_slice_index,
                 "L3_tube_current": self.l3_tube_current,

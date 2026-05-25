@@ -137,6 +137,7 @@ def compute_metrics(
     tissue_mask_data: ImageData,
     tissue_volume_data: ImageData,
     patient_height: float | None = None,
+    patient_weight: float | None = None,
 ) -> Metrics:
     """Compute area and mean Hounsfield Unit for segmented tissue masks.
     Also compute skeletal muscle index (SMI) if `patient_height` is given. Patient height needs to be in cm.
@@ -145,11 +146,13 @@ def compute_metrics(
         - area: cm^2
         - mean_hu: HU
         - SMI: cm^2 / m^2
+        - BMI: kg / m^2
 
     Args:
         tissue_mask_data (ImageData): Segmented tissue masks of SAT, VAT, IMAT and MUSCLE.
         tissue_volume_data (ImageData): Input nifti volume.
         patient_height (float | None, optional): Patient's height. Defaults to None.
+        patient_weight (float | None, optional): Patient's weight. Defaults to None.
 
     Returns:
         metrics (MetricsData): Computed metrics with cross-sectional area, mean HU and skeletal muscle index.
@@ -180,7 +183,15 @@ def compute_metrics(
         # skeletal muscle index (smi) = muscle area / (patient height ^ 2)
         # units: cm2 / m2 = (cm2) / (cm / 100) ^ 2
         smi = round(area["muscle"] / ((patient_height / 100.0) ** 2), ndigits=4)
-    return Metrics(area=area, mean_hu=mean_hu, skelet_muscle_index=smi)
+
+    bmi = 0.0
+    if patient_weight and patient_height:
+        # body mass index (bmi) = weight / (height ^ 2)
+        # units: kg / m2 = kg / (cm / 100) ^ 2
+        bmi = round(patient_weight / ((patient_height / 100.0) ** 2), ndigits=4)
+    return Metrics(
+        area=area, mean_hu=mean_hu, skelet_muscle_index=smi, body_mass_index=bmi
+    )
 
 
 def read_patient_list(
