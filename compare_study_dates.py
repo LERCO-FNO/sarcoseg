@@ -1,3 +1,4 @@
+from PIL.ImagePalette import raw
 import sys
 from argparse import ArgumentParser
 
@@ -42,7 +43,7 @@ def main():
 
     raw_rows = [
         {key: val for key, val in r.items() if key in columns}
-        | {"StudyDescription": "", "STUDY_INSTANCE_UID_PACS": []}
+        | {"STUDY_DESCRIPTION": "", "STUDY_INSTANCE_UID_PACS": []}
         for r in response.get("rows")
     ]
 
@@ -57,7 +58,7 @@ def main():
         print("can't establish PACS association")
         sys.exit(-1)
 
-    for row in tqdm(raw_rows, miniters=100, dynamic_miniters=False):
+    for row in tqdm(raw_rows, miniters=100):
         labkey_date, labkey_time = row["CAS_VYSETRENI"].split(
             " "
         )  # from format Y-m-d H:M:S
@@ -75,7 +76,7 @@ def main():
         ds = Dataset()
         ds.QueryRetrieveLevel = "STUDY"
         ds.PatientID = row["RODNE_CISLO"]
-        ds.StudyDate = DA(datetime.strptime(labkey_date, "%d-%m-%Y").strftime("%Y%m%d"))
+        ds.StudyDate = DA(datetime.strptime(labkey_date, "%Y-%m-%d").strftime("%Y%m%d"))
         # ds.StudyTime = f"{time_range[0]:02}-{time_range[1]:02}"  # format as 2 digit with leading zero for hours < 10
         ds.ModalitiesInStudy = "CT"
         ds.PatientSize = ""
@@ -88,27 +89,33 @@ def main():
         success_resp = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
 
         row["STUDY_INSTANCE_UID_PACS"] = [
-            resp.get("StudyInstanceUID", "n/a") for resp in success_resp
+            resp.get("StudyInstanceUID") for resp in success_resp
         ]
         row["STUDY_DESCRIPTION"] = [
-            resp.get("StudyDescription", "n/a") for resp in success_resp
+            resp.get("StudyDescription") for resp in success_resp
         ]
         row["CT_STUDY_DATE"] = [
-            datetime.strptime(resp.get("StudyDate", "n/a"), "%Y%m%d").strftime(
-                "%d-%m-%Y"
-            )
+            datetime.strptime(resp.get("StudyDate"), "%Y%m%d").strftime("%Y-%m-%d")
             for resp in success_resp
         ]
         # row["StudyTime"] = [resp.get("StudyTime", "n/a") for resp in success_resp]
 
-    pprint(raw_rows[:3])
     assoc.release()
     if assoc.is_released:
         print("PACS association released")
 
-    df = pd.DataFrame(raw_rows)
+    df = pd.DataFrame(raw_rows).explode(
+        ["STUDY_INSTANCE_UID_PACS", "STUDY_DESCRIPTION", "CT_STUDY_DATE"]
+    )
+
+    df["CAS_VYSETRENI"] = pd.to_datetime(df["CAS_VYSETRENI"])
+    df["CT_STUDY_DATE"] = pd.to_datetime(df["CT_STUDY_DATE"])
+
+    df["STUDY_TIME_MATCH"] = df["CAS_VYSETRENI"].dt.date == df["CT_STUDY_DATE"].dt.date
+    df["STUDY_UID_MATCH"] = df["STUDY_INSTANCE_UID"] == df["STUDY_INSTANCE_UID_PACS"]
+
     df.to_csv("single_studies.csv", header=True, sep=";")
-    print(df.head(3))
+    pprint(df.head(3))
 
 
 if __name__ == "__main__":
