@@ -88,7 +88,7 @@ def select(api: database.LabkeyAPI, schema: str, query: str, columns: list[str])
         print("can't establish PACS association")
         sys.exit(-1)
 
-    for row in tqdm(raw_rows):
+    for row in tqdm(raw_rows, miniters=100, dynamic_miniters=False):
         labkey_date, labkey_time = row["CAS_VYSETRENI"].split(
             " "
         )  # from format Y-m-d H:M:S
@@ -118,7 +118,7 @@ def select(api: database.LabkeyAPI, schema: str, query: str, columns: list[str])
         response = assoc.send_c_find(ds, study_root_qr_model_find)
         success_resp = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
 
-        row["STUDY_INSTANCE_UID"] = [
+        row["STUDY_INSTANCE_UID_PACS"] = [
             resp.get("StudyInstanceUID", "n/a") for resp in success_resp
         ]
         row["StudyDescription"] = [
