@@ -62,7 +62,7 @@ def main():
         print("can't establish PACS association")
         sys.exit(-1)
 
-    for row in tqdm(raw_rows, miniterval=5, maxinterval=5):
+    for row in tqdm(raw_rows, mininterval=5, maxinterval=5):
         # labkey_date, labkey_time = row["CAS_VYSETRENI"].split(
         #     " "
         # )  # from format Y-m-d H:M:S
@@ -90,12 +90,14 @@ def main():
 
         row["PACS_PATIENT_ID"] = [resp.get("PatientID") for resp in success_resp][0]
         row["PACS_STUDY_DATETIME"] = [
-            f"{datetime.strptime(resp.get('StudyDate'), '%Y%m%d').strftime('%Y-%m-%d')} {datetime.strptime(resp.get('StudyTime'), '%H%M%S').strftime('%H:%M:%s')}"
+            f"{datetime.strptime(resp.get('StudyDate'), '%Y%m%d').strftime('%Y-%m-%d')} {datetime.strptime(resp.get('StudyTime'), '%H%M%S.%f').strftime('%H:%M:%S')}"
             for resp in success_resp
         ][0]
         row["ACCESSION_NUMBER"] = [
             resp.get("AccessionNumber") for resp in success_resp
         ][0]
+        row["PATIENT_WEIGHT"] = [resp.get("PatientWeight") for resp in success_resp][0]
+        row["PATIENT_SIZE"] = [resp.get("PatientSize") for resp in success_resp][0]
         # row["StudyTime"] = [resp.get("StudyTime", "n/a") for resp in success_resp]
 
     assoc.release()
@@ -109,6 +111,11 @@ def main():
 
     df["CAS_VYSETRENI"] = pd.to_datetime(df["CAS_VYSETRENI"])
     df["PACS_STUDY_DATETIME"] = pd.to_datetime(df["PACS_STUDY_DATETIME"])
+
+    df["CAS_VYSETRENI_MATCH"] = (
+        df["CAS_VYSETRENI"].dt.date == df["PACS_STUDY_DATETIME"].dt.date
+    )
+    df["PACS_CISLO_MATCH"] = df["PACS_CISLO"] == df["ACCESSION_NUMBER"]
 
     df.to_csv("ct_study_datetimes.csv", header=True, sep=";")
     pprint(df.head(3))
