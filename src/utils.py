@@ -1,3 +1,4 @@
+from zipfile import ZipFile
 import logging
 import re
 import shutil
@@ -256,3 +257,21 @@ def remove_nnunet_jsons(dirpath: str | Path):
         for filename in files_to_delete
         for file in dirpath.rglob("*" + filename)
     ]
+
+
+def zip_study_dir(study_dir: Path):
+    zip_dirpath = study_dir.with_name(study_dir.name + ".zip")
+
+    with ZipFile(zip_dirpath, "w") as zipf:
+        files = [
+            file
+            for file in study_dir.rglob(("*"))
+            if file.name
+            not in [
+                "input_ct_volume.nii.gz",
+                "dataset.json",
+                "plans.json",
+                "predict_from_raw_data_args.json",
+            ]
+        ]
+        [zipf.write(file, file.relative_to(study_dir.parent)) for file in files]

@@ -256,6 +256,9 @@ def main(args: argparse.Namespace):
                 ],
             )
 
+        if args.zip_study_dir:
+            utils.zip_study_dir(output_study_dir)
+
         if args.remove_dicom_files:
             utils.remove_dicom_dir(input_study_dir)
 
