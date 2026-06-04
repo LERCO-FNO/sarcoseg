@@ -17,12 +17,14 @@ dependencies = [
     "simpleitk>=2.5.3",
     "pynetdicom>=3.0.4",
     "coloredlogs>=15.0.1",
+    "tqdm>=4.67.3",
 ]
 
 testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
+    "fastexcel>=0.20.2",
     "polars>=1.40.1",
     "pytest>=9.0.2",
     "xlsxwriter>=3.2.9",
