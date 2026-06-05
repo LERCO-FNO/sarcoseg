@@ -55,6 +55,18 @@ def main():
 
     print("PACS association established")
 
+    series_tags = []
+    for row in raw_rows:
+        ds = Dataset()
+        ds.QueryRetrieveLevel = "STUDY"
+        ds.StudyInstanceUID = row["STUDY_UID"]
+        ds.StudyDescription = ""
+        ds.StudyDate = ""
+        ds.SeriesDescription = ""
+
+        response = assoc.send_c_find(ds, study_root_qr_model_find)
+        success_resps = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
+
     assoc.release()
     if assoc.is_released:
         print("PACS association released")
