@@ -1,4 +1,3 @@
-from pydicom import dcmread
 import enum
 import json
 import logging
@@ -7,6 +6,8 @@ from pathlib import Path
 from typing import Any, Self
 
 import pandas as pd
+
+# from pydicom import dcmread
 from SimpleITK import Image
 
 from src.io import read_json
@@ -55,9 +56,9 @@ class StudyData:
     patient_id: str | None = field(default=None, repr=False, compare=False)
     study_date: str | None = field(default=None, repr=False, compare=False)
     patient_height: float | int | None = field(default=None, repr=False, compare=False)
-    patient_birthdate: str | None = field(default=None, repr=False, compare=False)
+    # patient_birthdate: str | None = field(default=None, repr=False, compare=False)
     series: dict[str, SeriesData] = field(default_factory=dict)
-    ct_relative_patient_age: int | None = field(default=None, repr=False, compare=False)
+    # ct_relative_patient_age: int | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     def _from_labkey_row(cls, row: dict[str, Any]) -> Self:
@@ -68,7 +69,7 @@ class StudyData:
             patient_height=height
             if (height := row.get("VYSKA_PAC.", 0.0)) and height
             else 0.0,
-            patient_birthdate=row.get("CAS_VYSETRENI"),
+            # patient_birthdate=row.get("CAS_VYSETRENI"),
         )
 
     @classmethod
@@ -130,9 +131,11 @@ class StudyData:
             "patient_height": self.patient_height,
             "study_date": self.study_date,
             "ct_relative_patient_age": self.ct_relative_patient_age,
+            # "ct_relative_patient_age": self.ct_relative_patient_age,
         }
         return [_study | series._to_dict() for series in self.series.values()]
 
+"""
     def calculate_ct_relative_patient_age(self, dicom_filepath: Path | str):
         study_date = dcmread(dicom_filepath, specific_tags=["StudyDate"]).get(
             "StudyDate", ""
@@ -150,7 +153,7 @@ class StudyData:
             self.patient_birthdate.split("-")[0]
         )  # parse year (YYYY-MM-DD HH:MM:SS.SSS) as int
         self.ct_relative_patient_age = ct_year - birth_year
-
+"""
 
 class ProcessResult(enum.Enum):
     NONE = "NONE"
