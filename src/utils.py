@@ -1,9 +1,9 @@
-from zipfile import ZipFile
 import logging
 import re
 import shutil
 from pathlib import Path
 from time import perf_counter
+from zipfile import ZipFile
 
 import pandas as pd
 import SimpleITK as sitk
@@ -272,6 +272,7 @@ def zip_study_dir(study_dir: Path):
                 "dataset.json",
                 "plans.json",
                 "predict_from_raw_data_args.json",
+                "inst_num_currents.json"
             ]
         ]
         [zipf.write(file, file.relative_to(study_dir.parent)) for file in files]
