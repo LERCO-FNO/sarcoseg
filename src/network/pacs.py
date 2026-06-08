@@ -10,8 +10,6 @@ from pydicom import dcmread
 from pydicom.multival import MultiValue
 from pynetdicom.apps.echoscu import echoscu
 
-# from pynetdicom.apps.movescu import movescu
-# from src import slogger
 from src.io import read_json
 from src.utils import SERIES_DESC_PATTERN
 
