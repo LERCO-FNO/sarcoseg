@@ -39,12 +39,18 @@ def get_args():
         help="path to segmentation output directory",
         default="./outputs",
     )
+    # parser.add_argument(
+    #     "-pl",
+    #     "--participant-list",
+    #     type=str,
+    #     help="path to list of labkey data (.csv/.txt)",
+    #     required=True
+    # )
     parser.add_argument(
-        "-pl",
-        "--participant-list",
-        type=str,
-        help="path to list of labkey data (.csv/.txt)",
-        required=True,
+        "-a",
+        "--amount",
+        type=int,
+        help="number of CT cases to query from labkey and segment",
     )
     parser.add_argument(
         "--upload-labkey",
@@ -79,10 +85,10 @@ def main(args: argparse.Namespace):
     setup_logger(debug)
     log = logging.getLogger("sarcoseg")
 
-    participants_df = utils.read_patient_list(
-        args.participant_list,
-        columns=["PARTICIPANT", "CAS_VYSETRENI"],
-    )
+    # participants_df = utils.read_patient_list(
+    #     args.participant_list,
+    #     columns=["PARTICIPANT", "CAS_VYSETRENI"],
+    # )
 
     labkey_api = database.LabkeyAPI.init_from_json(debug=debug)
     if not labkey_api.is_labkey_reachable():
@@ -90,36 +96,37 @@ def main(args: argparse.Namespace):
 
     queried_study_cases = labkey_api._select_rows(
         schema_name="lists",
-        query_name="RDG-CT-Sarko-All",
+        query_name="CT-Sarko-Select-Segmentation",
+        max_rows=args.amount,
         columns=[
             "PARTICIPANT",
-            "RODNE_CISLO",
-            "STUDY_INSTANCE_UID",
-            "PACS_CISLO",
-            "VYSKA_PAC.",
-            "VAHA_PAC.",
-            "CAS_VYSETRENI",
+            # "RODNE_CISLO",
+            "STUDY_UID",
+            # "PACS_CISLO",
+            "PATIENT_HEIGHT",
+            # "VAHA_PAC.",
+            # "CAS_VYSETRENI",
         ],
         filter_array=[
+            # QueryFilter(
+            #     "PARTICIPANT",
+            #     ";".join(participants_df["PARTICIPANT"].to_list()),
+            #     FILTER_TYPES.EQUALS_ONE_OF,
+            # ),
             QueryFilter(
-                "PARTICIPANT",
-                ";".join(participants_df["PARTICIPANT"].to_list()),
-                FILTER_TYPES.EQUALS_ONE_OF,
+                "SEGMENTATION_FINISHED",
+                "",
+                FILTER_TYPES.IS_BLANK,
             ),
             QueryFilter(
-                "CAS_VYSETRENI",
-                ";".join(participants_df["CAS_VYSETRENI"].to_list()),
-                FILTER_TYPES.EQUALS_ONE_OF,
-            ),
-            QueryFilter(
-                "VYSKA_PAC.",
+                "PATIENT_HEIGHT",
                 "",
                 QueryFilter.Types.IS_NOT_BLANK,
             ),
         ],
     )
 
-    unfinished_cases = labkey_api.exclude_finished_studies(queried_study_cases)
+    # unfinished_cases = labkey_api.exclude_finished_studies(queried_study_cases)
 
     if not queried_study_cases:
         log.critical(
@@ -127,10 +134,12 @@ def main(args: argparse.Namespace):
         )
         sys.exit(-1)
 
-    study_cases = [
-        StudyData._from_labkey_row(case)
-        for case in unfinished_cases.to_dict(orient="records")
-    ]
+    # study_cases = [
+    #     StudyData._from_labkey_row(case)
+    #     for case in unfinished_cases.to_dict(orient="records")
+    # ]
+
+    study_cases = [StudyData._from_labkey_row(case) for case in queried_study_cases]
 
     if len(study_cases) == 0:
         log.error("0 cases to process, exit...")
