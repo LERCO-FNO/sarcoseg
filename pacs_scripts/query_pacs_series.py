@@ -3,11 +3,9 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from labkey.api_wrapper import APIWrapper
-from labkey.query import QueryFilter
+import pandas as pd
 from pydicom import Dataset
 from pynetdicom import AE, sop_class
-from pynetdicom.sop_class import _QR_CLASSES
 from tqdm import tqdm
 
 from src.network import database, pacs
@@ -17,11 +15,8 @@ def main():
     labkey_api = database.LabkeyAPI.init_from_json()
     response = labkey_api.query.select_rows(
         "lists",
-        "RDG-CT-Sarko-All",
-        columns="STUDY_INSTANCE_UID",
-        filter_array=[
-            QueryFilter("STUDY_INSTANCE_UID", "", QueryFilter.Types.IS_NOT_BLANK),
-        ],
+        "CT-Sarko-Select-Segmentation",
+        columns="STUDY_UID",
     )
 
     study_uids = response.get("rows", None)
@@ -56,9 +51,9 @@ def main():
     print("PACS association established")
 
     series_tags = []
-    for row in raw_rows:
+    for row in tqdm(raw_rows, miniterval=5.0, maxinterval=5.0):
         ds = Dataset()
-        ds.QueryRetrieveLevel = "STUDY"
+        ds.QueryRetrieveLevel = "SERIES"
         ds.StudyInstanceUID = row["STUDY_UID"]
         ds.StudyDescription = ""
         ds.StudyDate = ""
@@ -67,9 +62,25 @@ def main():
         response = assoc.send_c_find(ds, study_root_qr_model_find)
         success_resps = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
 
+        [
+            series_tags.append(
+                {
+                    "STUDY_UID": row["STUDY_UID"],
+                    "STUDY_DESCRIPTION": resp.get("StudyDescription", "null"),
+                    "SERIES_DESCRIPTION": resp.get("SeriesDescription", "null"),
+                }
+            )
+            for resp in success_resps
+        ]
+
     assoc.release()
     if assoc.is_released:
         print("PACS association released")
+
+    df = pd.DataFrame(series_tags)
+    print(f"# of rows: {len(df)}")
+
+    df.to_csv("series_tags.csv", index=False, sep=";")
 
 
 if __name__ == "__main__":
