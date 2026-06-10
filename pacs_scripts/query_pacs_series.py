@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -51,6 +52,36 @@ def main():
     print("PACS association established")
 
     series_tags = []
+    series_desc_patterns = re.compile(
+        r"|".join(
+            [
+                "protocol",
+                "topogram",
+                "scout",
+                "patient",
+                "dose",
+                "report",
+                "monitor",
+                "text",
+                # "planning",
+                "mip",
+                "line",
+                "distance",
+                "head",
+                "coronal",
+                "cor",
+                "sag",
+                "sagital",
+                "sagittal",
+                "bestdiast",
+                "bestsyst",
+                "thick",
+                "result",
+            ]
+        ),
+        re.IGNORECASE,
+    )
+
     for row in tqdm(raw_rows, miniterval=5.0, maxinterval=5.0):
         ds = Dataset()
         ds.QueryRetrieveLevel = "SERIES"
@@ -62,22 +93,25 @@ def main():
         response = assoc.send_c_find(ds, study_root_qr_model_find)
         success_resps = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
 
-        [
+        for resp in success_resps:
+            series_desc = resp.get("SeriesDescription", "null")
+            if series_desc_patterns.search(series_desc):
+                continue
+
             series_tags.append(
                 {
                     "STUDY_UID": row["STUDY_UID"],
                     "STUDY_DESCRIPTION": resp.get("StudyDescription", "null"),
-                    "SERIES_DESCRIPTION": resp.get("SeriesDescription", "null"),
+                    "SERIES_DESCRIPTION": series_desc,
                 }
             )
-            for resp in success_resps
-        ]
 
     assoc.release()
     if assoc.is_released:
         print("PACS association released")
 
     df = pd.DataFrame(series_tags)
+    df.head(3)
     print(f"# of rows: {len(df)}")
 
     df.to_csv("series_tags.csv", index=False, sep=";")
