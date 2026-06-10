@@ -20,8 +20,8 @@ def main():
         columns="STUDY_UID",
     )
 
-    study_uids = response.get("rows", None)
-    if not study_uids:
+    raw_rows = response.get("rows", None)
+    if not raw_rows:
         raise ValueError("No study UIDs returned from labkey")
 
     study_root_qr_model_find = sop_class._QR_CLASSES.get(
@@ -29,11 +29,6 @@ def main():
     )
     if not study_root_qr_model_find:
         raise ValueError("No StudyRootQueryRetrieveInformationModelFind")
-
-    raw_rows = [
-        {"STUDY_UID": val for key, val in data.items() if key in ["STUDY_INSTANCE_UID"]}
-        for data in study_uids
-    ]
 
     print(f"returned {len(raw_rows)} rows")
 
@@ -82,7 +77,7 @@ def main():
         re.IGNORECASE,
     )
 
-    for row in tqdm(raw_rows, miniterval=5.0, maxinterval=5.0):
+    for row in tqdm(raw_rows, mininterval=5.0, maxinterval=5.0):
         ds = Dataset()
         ds.QueryRetrieveLevel = "SERIES"
         ds.StudyInstanceUID = row["STUDY_UID"]
