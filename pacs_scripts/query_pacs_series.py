@@ -84,19 +84,13 @@ def main():
         ds.StudyDescription = ""
         ds.StudyDate = ""
         ds.SeriesDescription = ""
-        ds.SliceThickness = ""
 
         response = assoc.send_c_find(ds, study_root_qr_model_find)
         success_resps = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
 
         for resp in success_resps:
             series_desc = resp.get("SeriesDescription", "null")
-            slice_thickness = resp.get("SliceThickness", None)
-
             if series_desc_patterns.search(series_desc):
-                continue
-
-            if not slice_thickness:
                 continue
 
             series_tags.append(
