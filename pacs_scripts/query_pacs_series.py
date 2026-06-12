@@ -132,6 +132,7 @@ def main():
         ds.StudyDate = ""
         ds.SeriesDescription = ""
         ds.NumberOfSeriesRelatedInstances = ""
+        ds.BodyPartExamined = ""
 
         response = assoc.send_c_find(ds, study_root_qr_model_find)
         success_resps = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
@@ -140,10 +141,11 @@ def main():
             series_desc = resp.get("SeriesDescription", "null")
 
             tags = {
-                "STUDY_UID": row["STUDY_UID"],
-                "STUDY_DESCRIPTION": resp.get("StudyDescription", None),
-                "SERIES_DESCRIPTION": series_desc,
-                "SERIES_INSTANCES": resp.get("NumberOfSeriesRelatedInstances", None),
+                "study_uid": row["STUDY_UID"],
+                "study_desc": resp.get("StudyDescription", None),
+                "series_desc": series_desc,
+                "series_instances": resp.get("NumberOfSeriesRelatedInstances", None),
+                "body_part": resp.get("BodyPartExamined"),
             }
 
             # early add expected series
