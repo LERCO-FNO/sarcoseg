@@ -120,7 +120,8 @@ def main():
                 "aort",
                 "chestpain",
             ]
-        )
+        ),
+        re.IGNORECASE,
     )
 
     for row in tqdm(raw_rows, mininterval=5.0, maxinterval=5.0):
