@@ -152,7 +152,7 @@ def main():
     for row in tqdm(raw_rows, mininterval=5.0, maxinterval=5.0):
         ds = Dataset()
         ds.QueryRetrieveLevel = "SERIES"
-        ds.StudyInstanceUID = row["STUDY_UID"]
+        ds.StudyInstanceUID = row["STUDY_INSTANCE_UID"]
         ds.StudyDescription = ""
         ds.StudyDate = ""
         ds.SeriesDescription = ""
@@ -171,7 +171,8 @@ def main():
             )
 
             tags = {
-                "study_uid": row["STUDY_UID"],
+                "participant": row["PARTICIPANT"],
+                "study_uid": row["STUDY_INSTANCE_UID"],
                 "study_datetime": study_datetime,
                 "study_desc": resp.get("StudyDescription", None),
                 "series_desc": series_desc,
