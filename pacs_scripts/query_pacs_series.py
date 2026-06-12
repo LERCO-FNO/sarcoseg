@@ -101,6 +101,17 @@ def main():
                 "hr",
                 "ur",
                 "vessel",
+                "arrow",
+                "pixel",
+                "stenosis",
+                "vasc",
+                "lens",
+                "new series",
+                "mensio",
+                "collection",
+                "admire",
+                "ap",
+                "electronic",
             ]
         ),
         re.IGNORECASE,
@@ -110,6 +121,8 @@ def main():
         r"|".join(
             [
                 "abdomen",
+                "abdolung",
+                "thorabd",
                 "arterial",
                 "nephr",
                 "venous",
@@ -119,6 +132,18 @@ def main():
                 "cta",
                 "aort",
                 "chestpain",
+                "spine",
+                "extermity",
+                "hip",
+                "spiral",
+                "late",
+                "skelet",
+                "osteo",
+                "pelvis",
+                "avi",
+                "chestcas",
+                "telo",
+                "wholebody",
             ]
         ),
         re.IGNORECASE,
@@ -154,11 +179,11 @@ def main():
                 continue
 
             # skip other series
-            if series_desc_patterns.search(series_desc):
-                continue
+            # if series_desc_patterns.search(series_desc):
+            #     continue
 
             # add the series if checks above failed
-            series_tags.append(tags)
+            # series_tags.append(tags)
 
     assoc.release()
     if assoc.is_released:
