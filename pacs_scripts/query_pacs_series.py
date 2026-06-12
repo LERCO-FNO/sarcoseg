@@ -77,6 +77,23 @@ def main():
         re.IGNORECASE,
     )
 
+    series_desc_keep_patterns = re.compile(
+        r"|".join(
+            [
+                "abdomen",
+                "arterial",
+                "nephr",
+                "venous",
+                "thorax",
+                "lung",
+                "angio",
+                "cta",
+                "aort",
+                "chestpain",
+            ]
+        )
+    )
+
     for row in tqdm(raw_rows, mininterval=5.0, maxinterval=5.0):
         ds = Dataset()
         ds.QueryRetrieveLevel = "SERIES"
@@ -84,22 +101,32 @@ def main():
         ds.StudyDescription = ""
         ds.StudyDate = ""
         ds.SeriesDescription = ""
+        ds.NumberOfSeriesRelatedInstances = ""
 
         response = assoc.send_c_find(ds, study_root_qr_model_find)
         success_resps = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
 
         for resp in success_resps:
             series_desc = resp.get("SeriesDescription", "null")
+
+            tags = {
+                "STUDY_UID": row["STUDY_UID"],
+                "STUDY_DESCRIPTION": resp.get("StudyDescription", None),
+                "SERIES_DESCRIPTION": series_desc,
+                "SERIES_INSTANCES": resp.get("NumberOfSeriesRelatedInstances", None),
+            }
+
+            # early add expected series
+            if series_desc_keep_patterns.search(series_desc):
+                series_tags.append(tags)
+                continue
+
+            # skip other series
             if series_desc_patterns.search(series_desc):
                 continue
 
-            series_tags.append(
-                {
-                    "STUDY_UID": row["STUDY_UID"],
-                    "STUDY_DESCRIPTION": resp.get("StudyDescription", "null"),
-                    "SERIES_DESCRIPTION": series_desc,
-                }
-            )
+            # add the series if checks above failed
+            series_tags.append(tags)
 
     assoc.release()
     if assoc.is_released:
