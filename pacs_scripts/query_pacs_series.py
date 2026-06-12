@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd
+from labkey.query import QueryFilter
 from pydicom import Dataset
 from pynetdicom import AE, sop_class
 from tqdm import tqdm
@@ -18,6 +19,9 @@ def main():
         "lists",
         "RDG-CT-Sarko-All",
         columns="PARTICIPANT,STUDY_INSTANCE_UID,CAS_VYSETRENI,PACS_CAS_VYSETRENI",
+        filter_array=QueryFilter(
+            "STUDY_INSTANCE_UID", "", QueryFilter.Types.IS_NOT_BLANK
+        ),
     )
 
     raw_rows = response.get("rows", None)
