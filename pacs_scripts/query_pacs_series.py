@@ -47,82 +47,82 @@ def main():
     print("PACS association established")
 
     series_tags = []
-    # series_desc_patterns = re.compile(
-    #     r"|".join(
-    #         [
-    #             "protocol",
-    #             "topogram",
-    #             "scout",
-    #             "patient",
-    #             "dose",
-    #             "report",
-    #             "monitor",
-    #             "text",
-    #             # "planning",
-    #             "mip",
-    #             "line",
-    #             "distance",
-    #             "head",
-    #             "coronal",
-    #             # "cor",
-    #             "sag",
-    #             "sagital",
-    #             "sagittal",
-    #             # "bestdiast",
-    #             # "bestsyst",
-    #             "thick",
-    #             "result",
-    #             "bl57",
-    #             "vrt",
-    #             "view",
-    #             "range",
-    #             "3d",
-    #             "curve",
-    #             "vpravo",
-    #             "vlevo",
-    #             "venozni",
-    #             "vytok",
-    #             "okno",
-    #             "kost",
-    #             "snapshot",
-    #             "roi",
-    #             "circle",
-    #             "hlava",
-    #             "neck",
-    #             "marker",
-    #             "private",
-    #             "axial",
-    #             "regist",
-    #             "50kev",
-    #             "cad",
-    #             "iodine",
-    #             "vnc",
-    #             "kidney",
-    #             "hr",
-    #             "ur",
-    #             "vessel",
-    #         ]
-    #     ),
-    #     re.IGNORECASE,
-    # )
+    series_desc_patterns = re.compile(
+        r"|".join(
+            [
+                "protocol",
+                "topogram",
+                "scout",
+                "patient",
+                "dose",
+                "report",
+                "monitor",
+                "text",
+                # "planning",
+                "mip",
+                "line",
+                "distance",
+                "head",
+                "coronal",
+                # "cor",
+                "sag",
+                "sagital",
+                "sagittal",
+                # "bestdiast",
+                # "bestsyst",
+                "thick",
+                "result",
+                "bl57",
+                "vrt",
+                "view",
+                "range",
+                "3d",
+                "curve",
+                "vpravo",
+                "vlevo",
+                "venozni",
+                "vytok",
+                "okno",
+                "kost",
+                "snapshot",
+                "roi",
+                "circle",
+                "hlava",
+                "neck",
+                "marker",
+                "private",
+                "axial",
+                "regist",
+                "50kev",
+                "cad",
+                "iodine",
+                "vnc",
+                "kidney",
+                "hr",
+                "ur",
+                "vessel",
+            ]
+        ),
+        re.IGNORECASE,
+    )
 
-    # series_desc_keep_patterns = re.compile(
-    #     r"|".join(
-    #         [
-    #             "abdomen",
-    #             "arterial",
-    #             "nephr",
-    #             "venous",
-    #             "thorax",
-    #             "lung",
-    #             "angio",
-    #             "cta",
-    #             "aort",
-    #             "chestpain",
-    #         ]
-    #     ),
-    #     re.IGNORECASE,
-    # )
+    series_desc_keep_patterns = re.compile(
+        r"|".join(
+            [
+                "abdomen",
+                "arterial",
+                "nephr",
+                "venous",
+                "thorax",
+                "lung",
+                "angio",
+                "cta",
+                "aort",
+                "chestpain",
+            ]
+        ),
+        re.IGNORECASE,
+    )
 
     for row in tqdm(raw_rows, mininterval=5.0, maxinterval=5.0):
         ds = Dataset()
@@ -149,13 +149,13 @@ def main():
             }
 
             # early add expected series
-            # if series_desc_keep_patterns.search(series_desc):
-            #     series_tags.append(tags)
-            #     continue
+            if series_desc_keep_patterns.search(series_desc):
+                series_tags.append(tags)
+                continue
 
             # skip other series
-            # if series_desc_patterns.search(series_desc):
-            #     continue
+            if series_desc_patterns.search(series_desc):
+                continue
 
             # add the series if checks above failed
             series_tags.append(tags)
