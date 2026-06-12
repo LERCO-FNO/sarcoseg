@@ -16,8 +16,8 @@ def main():
     labkey_api = database.LabkeyAPI.init_from_json()
     response = labkey_api.query.select_rows(
         "lists",
-        "CT-Sarko-Select-Segmentation",
-        columns="STUDY_UID",
+        "RDG-CT-Sarko-All",
+        columns="PARTICIPANT,STUDY_INSTANCE_UID,CAS_VYSETRENI,PACS_CAS_VYSETRENI",
     )
 
     raw_rows = response.get("rows", None)
@@ -164,9 +164,15 @@ def main():
 
         for resp in success_resps:
             series_desc = resp.get("SeriesDescription", "null")
+            study_datetime = (
+                row["PACS_CAS_VYSETRENI"]
+                if row["PACS_CAS_VYSETRENI"]
+                else row["CAS_VYSETRENI"]
+            )
 
             tags = {
                 "study_uid": row["STUDY_UID"],
+                "study_datetime": study_datetime,
                 "study_desc": resp.get("StudyDescription", None),
                 "series_desc": series_desc,
                 "series_instances": resp.get("NumberOfSeriesRelatedInstances", None),
