@@ -51,6 +51,7 @@ def get_args():
         "--amount",
         type=int,
         help="number of CT cases to query from labkey and segment",
+        default=1,
     )
     parser.add_argument(
         "--upload-labkey",
