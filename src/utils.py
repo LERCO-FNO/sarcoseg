@@ -3,7 +3,7 @@ import re
 import shutil
 from pathlib import Path
 from time import perf_counter
-from zipfile import ZipFile
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pandas as pd
 import SimpleITK as sitk
@@ -259,10 +259,10 @@ def remove_nnunet_jsons(dirpath: str | Path):
     ]
 
 
-def zip_study_dir(study_dir: Path):
+def zip_study_dir(study_dir: Path) -> Path:
     zip_dirpath = study_dir.with_name(study_dir.name + ".zip")
 
-    with ZipFile(zip_dirpath, "w") as zipf:
+    with ZipFile(zip_dirpath, "w", compression=ZIP_DEFLATED) as zipf:
         files = [
             file
             for file in study_dir.rglob(("*"))
@@ -272,7 +272,8 @@ def zip_study_dir(study_dir: Path):
                 "dataset.json",
                 "plans.json",
                 "predict_from_raw_data_args.json",
-                "inst_num_currents.json"
+                "inst_num_currents.json",
             ]
         ]
         [zipf.write(file, file.relative_to(study_dir.parent)) for file in files]
+    return zip_dirpath
