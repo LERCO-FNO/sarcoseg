@@ -308,7 +308,9 @@ class StudySegmentationResult:
             },
         )
 
-    def _to_list_of_dicts(self) -> list[dict[str, Any]]:
+    def _to_list_of_dicts(
+        self, remote_image_paths: dict[str, dict[str, str]] | None = None
+    ) -> list[dict[str, Any]]:
         study_base = {
             "participant": self.participant,
             "patient_height": self.patient_height,
@@ -325,12 +327,15 @@ class StudySegmentationResult:
                 "series_inst_uid": result.series_inst_uid,
                 "contrast_phase": result.contrast_phase,
             }
-            metrics = result.metrics._to_dict() if result.metrics else {}
 
+            metrics = result.metrics._to_dict() if result.metrics else {}
             combined = study_base | results | metrics
 
-            flattened_items.append(combined)
+            if remote_image_paths:
+                series_images = remote_image_paths[uid]
+                combined = combined | series_images
 
+            flattened_items.append(combined)
         return flattened_items
 
 

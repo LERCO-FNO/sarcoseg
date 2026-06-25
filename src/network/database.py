@@ -1,10 +1,14 @@
+import functools
 import logging
+import shutil
+from pathlib import Path
 from typing import Any, Self
 
 import pandas as pd
 import requests
 from labkey.api_wrapper import APIWrapper
 from labkey.query import QueryFilter
+from webdav3.client import Client
 
 from src.io import read_json
 
@@ -36,6 +40,14 @@ class LabkeyAPI(APIWrapper):
             disable_csrf,
             allow_redirects,
         )
+
+    @functools.cached_property
+    def _webdav_client(self) -> Client:
+        return self.server_context.webdav_client()
+
+    def _build_webdav_url(self, *path_parts: str) -> str:
+        relative = "/".join(p.strip("/") for p in path_parts if p)
+        return self.server_context.webdav_path(file_name=relative)
 
     def is_labkey_reachable(self):
         hostname = self.server_context.hostname
@@ -137,6 +149,58 @@ class LabkeyAPI(APIWrapper):
             .isin(finished_studies)
             .reset_index(drop=True)
         ]
+
+    def upload_images(self, study_dir: str | Path) -> dict[str, dict[str, str]]:
+        """
+        Send segmentation images to Labkey remote through WebDAV. File path on remote has this format:
+            PATxxx_STUDYUID/CONTRAST_PHASE/<image1, ...>
+
+            Returns remote image paths.
+        """
+
+        if isinstance(study_dir, str):
+            study_dir = Path(study_dir)
+
+        tmp_dir = study_dir.with_name("tmp_" + study_dir.name) / study_dir.name
+        shutil.copytree(
+            study_dir,
+            tmp_dir,
+            ignore=shutil.ignore_patterns("*.nii.gz", "*.json"),
+            dirs_exist_ok=True,
+        )
+
+        remote_path = self._build_webdav_url("segmentation_images", tmp_dir.name)
+        try:
+            print(f"sending {tmp_dir} to {remote_path}")
+            self._webdav_client.upload_directory(remote_path, tmp_dir)
+        except Exception as exc:
+            print(exc)
+
+        shutil.rmtree(tmp_dir)
+
+        series_dirs = [
+            {"name": path["name"], "path": path["path"]}
+            for path in self._webdav_client.list(remote_path, get_info=True)
+        ]
+
+        series_image_paths = {
+            series["name"]: {
+                file_item["name"].removesuffix(".png"): file_item["path"]
+                for file_item in self._webdav_client.list(series["path"], get_info=True)
+            }
+            for series in series_dirs
+        }
+
+        return series_image_paths
+
+    def upload_zip_result(self, zip_path: Path) -> str:
+        remote_path = self._build_webdav_url("segmentation_results", zip_path.name)
+        print(remote_path)
+        try:
+            self._webdav_client.upload_file(remote_path, zip_path)
+        except Exception as exc:
+            log.exception(exc)
+        return remote_path
 
     @classmethod
     def init_from_json(cls, debug: bool = False) -> Self:
