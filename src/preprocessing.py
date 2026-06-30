@@ -163,7 +163,10 @@ def filter_dicom_files(
                 if isinstance(convolution_kernel, MultiValue)
                 else convolution_kernel
             )
-            if "bl57" in convolution_kernel.lower():
+            if any(
+                test_kernel in convolution_kernel.lower()
+                for test_kernel in ("bl57", "hr")
+            ):
                 continue
 
         # filter out remaining files with series matching pattern:
@@ -211,6 +214,11 @@ def select_series_to_segment(
         series_desc: str = dataset.SeriesDescription
 
         convolution_kernel = dataset.get("ConvolutionKernel", None)
+        if isinstance(convolution_kernel, MultiValue):
+            convolution_kernel = convolution_kernel[0]
+
+        if not convolution_kernel:
+            convolution_kernel = "none"
 
         series_data = SeriesData(
             series_uid=series_uid,
@@ -220,7 +228,7 @@ def select_series_to_segment(
             filepaths_num=len(filepaths),
             # has_contrast=True if contrast_applied else False,
             irradiation_event_uid=dataset.get("IrradiationEventUID", "n/a"),
-            convolution_kernel=convolution_kernel[0] if convolution_kernel else "n/a",
+            convolution_kernel=convolution_kernel,  # if convolution_kernel else "none",
         )
 
         contrast_applied = dataset.get("ContrastBolusAgent", None)
