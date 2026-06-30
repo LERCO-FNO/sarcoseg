@@ -45,7 +45,7 @@ def preprocess_dicom_study(
 
     dicom_files, dicom_dir = dicom_file_dir
     log.debug(
-        f"preprocessing DICOM files for case {study_case.participant}, study {study_case.study_inst_uid}"
+        f"preprocessing DICOM files for case {study_case.participant}, study {study_case.study_uid}"
     )
 
     series_files_map, dose_report_paths = filter_dicom_files(dicom_files)
@@ -217,7 +217,7 @@ def select_series_to_segment(
         convolution_kernel = dataset.get("ConvolutionKernel", None)
 
         series_data = SeriesData(
-            series_inst_uid=series_uid,
+            series_uid=series_uid,
             series_description=series_desc,
             slice_thickness=float(dataset.get("SliceThickness", -1.0)),
             filepaths=filepaths,

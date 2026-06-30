@@ -16,7 +16,7 @@ log = logging.getLogger("classes")
 
 @dataclass
 class SeriesData:
-    series_inst_uid: str
+    series_uid: str
     series_description: str | None = None
     filepaths: list[Path] = field(default_factory=list, repr=False)
     filepaths_num: int | None = field(default=None, repr=False)
@@ -50,7 +50,7 @@ class SeriesData:
 @dataclass
 class StudyData:
     participant: str
-    study_inst_uid: str
+    study_uid: str
     patient_height: float | int | None = field(default=None, repr=False, compare=False)
     series: dict[str, SeriesData] = field(default_factory=dict)
 
@@ -58,9 +58,9 @@ class StudyData:
     def _from_labkey_row(cls, row: dict[str, Any]) -> Self:
         return cls(
             participant=row.get("PARTICIPANT"),
-            study_inst_uid=row.get("STUDY_INSTANCE_UID"),
+            study_uid=row.get("STUDY_UID"),
             patient_height=height
-            if (height := row.get("VYSKA_PAC.", 0.0)) and height
+            if (height := row.get("PATIENT_HEIGHT", 0.0)) and height
             else 0.0,
         )
 
@@ -105,7 +105,7 @@ class StudyData:
             },
         )
 
-        filepath = output_dir.joinpath(f"dicom_tags_{self.study_inst_uid}.json")
+        filepath = output_dir.joinpath(f"dicom_tags_{self.study_uid}.json")
         if filepath.exists():
             log.debug(f"overwriting existing file at `{str(filepath)}`")
 
@@ -113,13 +113,13 @@ class StudyData:
             json.dump(serialized, file, indent=2)
 
         log.debug(
-            f"written DICOM tags for {self.participant=}, {self.study_inst_uid=}\nfields excluded: {exclude}"
+            f"written DICOM tags for {self.participant=}, {self.study_uid=}\nfields excluded: {exclude}"
         )
 
     def _to_list_of_dicts(self) -> list[dict[str, Any]]:
         _study = {
             "participant": self.participant,
-            "study_inst_uid": self.study_inst_uid,
+            "study_uid": self.study_uid,
             "patient_height": self.patient_height,
         }
         return [_study | series._to_dict() for series in self.series.values()]
@@ -188,18 +188,18 @@ class Metrics:
         self.process_durations = durations
         self.total_duration = sum(durations.__dict__.values())
 
-    def set_l3_tube_current(self, study_dir, series_inst_uid: str):
+    def set_l3_tube_current(self, study_dir, series_uid: str):
         with open(Path(study_dir, "inst_num_currents.json"), "r") as file:
-            series_currents = json.load(file).get(series_inst_uid, None)
+            series_currents = json.load(file).get(series_uid, None)
 
             if not series_currents:
-                log.warning(f"series {series_inst_uid} has no tube currents")
+                log.warning(f"series {series_uid} has no tube currents")
                 return
 
             self.l3_tube_current = series_currents.get(str(self.l3_slice_index), -1)
             if self.l3_tube_current == -1:
                 log.warning(
-                    f"series {series_inst_uid} has no tube current at L3 slice {self.l3_slice_index}"
+                    f"series {series_uid} has no tube current at L3 slice {self.l3_slice_index}"
                 )
 
     @classmethod
@@ -218,7 +218,7 @@ class Metrics:
 
 @dataclass
 class SeriesSegmentationResult:
-    series_inst_uid: str
+    series_uid: str
     status: ProcessResult = field(default=ProcessResult.NONE)
     contrast_phase: str | None = None
     metrics: Metrics | None = field(default=None)
@@ -227,29 +227,25 @@ class SeriesSegmentationResult:
 @dataclass
 class StudySegmentationResult:
     participant: str
-    study_inst_uid: str
+    study_uid: str
     patient_height: float | None = None
     series_results: dict[str, SeriesSegmentationResult] = field(default_factory=dict)
 
     def add_result(self, result: SeriesSegmentationResult):
         if not result.metrics:
-            log.warning(f"metrics for {result.series_inst_uid} is None")
+            log.warning(f"metrics for {result.series_uid} is None")
         if result.status is ProcessResult.NONE:
-            log.warning(
-                f"result status for {result.series_inst_uid} is {result.status}"
-            )
+            log.warning(f"result status for {result.series_uid} is {result.status}")
 
-        log.debug(
-            f"added series result {result.series_inst_uid} for study {self.study_inst_uid}"
-        )
+        log.debug(f"added series result {result.series_uid} for study {self.study_uid}")
 
-        self.series_results[result.series_inst_uid] = result
+        self.series_results[result.series_uid] = result
 
     @classmethod
     def _from_study_case(cls, study_data: StudyData) -> Self:
         return cls(
             participant=study_data.participant,
-            study_inst_uid=study_data.study_inst_uid,
+            study_uid=study_data.study_uid,
             patient_height=study_data.patient_height,
         )
 
@@ -277,7 +273,7 @@ class StudySegmentationResult:
         )
         # if key not in exclude
 
-        filepath = output_dir.joinpath(f"metrics_{self.study_inst_uid}.json")
+        filepath = output_dir.joinpath(f"metrics_{self.study_uid}.json")
         if filepath.exists():
             log.debug(f"overwriting existing file at `{str(filepath)}`")
 
@@ -285,7 +281,7 @@ class StudySegmentationResult:
             json.dump(serialized, file, indent=2)
 
         log.debug(
-            f"written segmentation results for participant {self.participant}, study {self.study_inst_uid}"
+            f"written segmentation results for participant {self.participant}, study {self.study_uid}"
         )
 
     @classmethod
@@ -293,11 +289,11 @@ class StudySegmentationResult:
         data = read_json(path)
         return cls(
             participant=data.get("participant"),
-            study_inst_uid=data.get("study_inst_uid"),
+            study_uid=data.get("study_uid"),
             patient_height=data.get("patient_height"),
             series_results={
                 uid: SeriesSegmentationResult(
-                    series_inst_uid=uid,
+                    series_uid=uid,
                     status=ProcessResult(result.get("status")),
                     contrast_phase=result.get("contrast_phase"),
                     metrics=Metrics._from_dict(metrics)
@@ -314,7 +310,7 @@ class StudySegmentationResult:
         study_base = {
             "participant": self.participant,
             "patient_height": self.patient_height,
-            "study_inst_uid": self.study_inst_uid,
+            "study_uid": self.study_uid,
         }
 
         flattened_items = []
@@ -324,7 +320,7 @@ class StudySegmentationResult:
                 "status": result.status.value
                 if isinstance(result.status, ProcessResult)
                 else result.status,
-                "series_inst_uid": result.series_inst_uid,
+                "series_uid": result.series_uid,
                 "contrast_phase": result.contrast_phase,
             }
 
@@ -347,9 +343,9 @@ class Report:
     def add_case(
         self,
         participant: str,
-        study_instance_uid: str,
+        study_uid: str,
         process_result: ProcessResult | str,
-        series_instance_uid: str | None = None,
+        series_uid: str | None = None,
     ):
 
         if isinstance(process_result, ProcessResult):
@@ -357,8 +353,8 @@ class Report:
 
         row: dict[str, Any] = {
             "participant": participant,
-            "study_inst_uid": study_instance_uid,
-            "series_inst_uid": series_instance_uid,
+            "study_uid": study_uid,
+            "series_uid": series_uid,
             "process_result": process_result,
         }
         self.data_rows.append(row)

@@ -35,7 +35,7 @@ class PacsAPI:
         self.aem = aem if aem else aet
         self.store_port = store_port
 
-    def _movescu(self, study_inst_uid: str, download_directory: str | Path):
+    def _movescu(self, study_uid: str, download_directory: str | Path):
         response_dir = Path(download_directory, "rsp")
         response_dir.mkdir(exist_ok=True, parents=True)
 
@@ -58,7 +58,7 @@ class PacsAPI:
             "-k",
             "ConvolutionKernel",
             "-k",
-            f"StudyInstanceUID={study_inst_uid}",
+            f"StudyInstanceUID={study_uid}",
             "-od",
             str(response_dir),
         ]
@@ -114,11 +114,11 @@ class PacsAPI:
             "-k",
             "QueryRetrieveLevel=SERIES",
             "-k",
-            f"StudyInstanceUID={study_inst_uid}",
+            f"StudyInstanceUID={study_uid}",
             # TODO: add response files here!!!
         ] + query_files
 
-        log.debug(f"running C-MOVE for StudyInstanceUID: {study_inst_uid}")
+        log.debug(f"running C-MOVE for StudyInstanceUID: {study_uid}")
         result = subprocess.run(args, capture_output=True, text=True)
 
         # clean the response directory
@@ -127,7 +127,7 @@ class PacsAPI:
         if len(os.listdir(download_directory)) == 0:
             os.rmdir(download_directory)
             log.error(
-                f"C-MOVE failed downloading data for StudyInstanceUID: {study_inst_uid}"
+                f"C-MOVE failed downloading data for StudyInstanceUID: {study_uid}"
             )
             return -1
 

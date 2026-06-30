@@ -49,10 +49,10 @@ def segment_ct_study(
 
     for series_filepath in series_nifti_filepaths:
         series_output_dir = series_filepath.parent
-        series_inst_uid = series_output_dir.parts[-1]
-        contrast_phase = study_case.series[series_inst_uid].contrast_phase
+        series_uid = series_output_dir.parts[-1]
+        contrast_phase = study_case.series[series_uid].contrast_phase
 
-        log.info(f"running segmentation series {series_inst_uid}")
+        log.info(f"running segmentation series {series_uid}")
 
         spine_mask_data, spine_duration = segment_spine(
             series_filepath, series_output_dir
@@ -66,12 +66,12 @@ def segment_ct_study(
         )
 
         series_seg_result = SeriesSegmentationResult(
-            series_inst_uid=series_inst_uid, contrast_phase=contrast_phase
+            series_uid=series_uid, contrast_phase=contrast_phase
         )
 
         if not slice_extraction_result:
             log.warning(
-                f"participant {study_segmentation.participant}, study {study_segmentation.study_inst_uid}, series {series_inst_uid} has no L3 mask"
+                f"participant {study_segmentation.participant}, study {study_segmentation.study_uid}, series {series_uid} has no L3 mask"
             )
             series_seg_result.status = ProcessResult.MISSING_L3_MASK
             study_segmentation.add_result(series_seg_result)
@@ -109,12 +109,12 @@ def segment_ct_study(
         metrics.l3_slice_index = centroids.body_centroid[-1]
         metrics.image_z_size = input_volume_data.image.GetDepth()
 
-        metrics.set_l3_tube_current(output_dir, series_inst_uid)
+        metrics.set_l3_tube_current(output_dir, series_uid)
 
         series_seg_result.metrics = metrics
         series_seg_result.status = ProcessResult.SEGMENTATION_FINISHED
         study_segmentation.add_result(series_seg_result)
-        log.debug(f"segmentation finished for series {series_inst_uid}")
+        log.debug(f"segmentation finished for series {series_uid}")
 
         # case_images_dir = series_output_dir.joinpath("images")
         # case_images_dir.mkdir(exist_ok=True)
@@ -133,7 +133,7 @@ def segment_ct_study(
         log.debug("saved mask overlays")
 
     study_segmentation._write_to_json(output_dir)
-    log.debug(f" {series_inst_uid}")
+    log.debug(f" {series_uid}")
     return study_segmentation
 
 

@@ -97,9 +97,10 @@ def main(args: argparse.Namespace):
 
     queried_study_cases = labkey_api._select_rows(
         schema_name="lists",
-        query_name="CT-Sarko-Select-Segmentation",
+        query_name="CT-Sarko-Selected-Segmentation",
         max_rows=args.amount,
         columns=[
+            "ID",
             "PARTICIPANT",
             # "RODNE_CISLO",
             "STUDY_UID",
@@ -142,6 +143,16 @@ def main(args: argparse.Namespace):
 
     study_cases = [StudyData._from_labkey_row(case) for case in queried_study_cases]
 
+    # only for later updating of CT-Sarko-Selected-Segmentation which needs Labkey row ID
+    queried_study_cases_dict = {
+        case["STUDY_UID"]: {
+            "ID": case["ID"],
+            "STUDY_UID": case["STUDY_UID"],
+            "PARTICIPANT": case["PARTICIPANT"],
+        }
+        for case in queried_study_cases
+    }
+
     if len(study_cases) == 0:
         log.error("0 cases to process, exit...")
         sys.exit(-1)
@@ -166,7 +177,7 @@ def main(args: argparse.Namespace):
     for study_case in study_cases:
         log.info("-" * 50)
 
-        input_study_dir = Path(args.input_dir, study_case.study_inst_uid)
+        input_study_dir = Path(args.input_dir, study_case.study_uid)
 
         if not input_study_dir.exists() and list(input_study_dir.rglob("*")) != 0:
             log.info(
@@ -174,24 +185,24 @@ def main(args: argparse.Namespace):
             )
 
             status = pacs_api._movescu(
-                study_case.study_inst_uid,
+                study_case.study_uid,
                 input_study_dir,
             )
 
             if status == -1:
                 report.add_case(
                     study_case.participant,
-                    study_case.study_inst_uid,
+                    study_case.study_uid,
                     ProcessResult.MISSING_ON_PACS_OR_LOCAL,
                 )
                 continue
 
         output_study_dir = Path(
-            output_dir, f"{study_case.participant}_{study_case.study_inst_uid}"
+            output_dir, f"{study_case.participant}_{study_case.study_uid}"
         )
 
         log.info(
-            f"preprocessing case {study_case.participant}, study {study_case.study_inst_uid}"
+            f"preprocessing case {study_case.participant}, study {study_case.study_uid}"
         )
         preprocessing.preprocess_dicom_study(
             input_study_dir,
@@ -201,17 +212,17 @@ def main(args: argparse.Namespace):
 
         if not study_case.series:
             log.warning(
-                f"case {study_case.participant}, study {study_case.study_inst_uid} has no series to segment"
+                f"case {study_case.participant}, study {study_case.study_uid} has no series to segment"
             )
             report.add_case(
                 study_case.participant,
-                study_case.study_inst_uid,
+                study_case.study_uid,
                 ProcessResult.NO_SERIES_TO_SEGMENT,
             )
             continue
 
         log.info(
-            f"segmenting case {study_case.participant}, study {study_case.study_inst_uid}"
+            f"segmenting case {study_case.participant}, study {study_case.study_uid}"
         )
         segmentation_result = segmentation.segment_ct_study(
             output_study_dir,
@@ -219,13 +230,13 @@ def main(args: argparse.Namespace):
             study_case=study_case,
         )
         log.info(
-            f"segmenting finished for {study_case.participant}, study {study_case.study_inst_uid}"
+            f"segmenting finished for {study_case.participant}, study {study_case.study_uid}"
         )
 
         for series_uid, result in segmentation_result.series_results.items():
             report.add_case(
                 study_case.participant,
-                study_case.study_inst_uid,
+                study_case.study_uid,
                 result.status,
                 series_uid,
             )
@@ -240,7 +251,7 @@ def main(args: argparse.Namespace):
                 )
             else:
                 log.warning(
-                    f"case {study_case.participant}, study {study_case.study_inst_uid} has no DICOM data to send to labkey"
+                    f"case {study_case.participant}, study {study_case.study_uid} has no DICOM data to send to labkey"
                 )
 
             # remote_image_paths = labkey_api.upload_images(output_study_dir)
@@ -255,18 +266,20 @@ def main(args: argparse.Namespace):
                 )
             else:
                 log.warning(
-                    f"case {study_case.participant}, study {study_case.study_inst_uid} has no segmentation data to send to labkey"
+                    f"case {study_case.participant}, study {study_case.study_uid} has no segmentation data to send to labkey"
                 )
 
-            labkey_api._insert_rows(
+            # FIX: change this into update_rows(..., ), rows=[{ID: <id>, "SEGMENTATION_FINISHED": True/"X"}])
+            data = queried_study_cases_dict.get(study_case.study_uid)
+            if not data:
+                log.error(
+                    f"Unknown or None data to update at CT-Sarko-Selected-Segmentation\n: {data}"
+                )
+                continue
+            labkey_api.query.update_rows(
                 "lists",
-                "CT-Segmentation-Finished",
-                rows=[
-                    {
-                        "PARTICIPANT": study_case.participant,
-                        "STUDY_INSTANCE_UID": study_case.study_inst_uid,
-                    }
-                ],
+                "CT-Sarko-Selected-Segmentation",  # CT-Sarko-Selected-Segmentation
+                rows=[{"ID": data["ID"], "SEGMENTATION_FINISHED": "X"}],
             )
 
         if args.zip_study_dir:
