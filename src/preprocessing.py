@@ -10,23 +10,22 @@ from pydicom.multival import MultiValue
 from SimpleITK import ImageSeriesReader, WriteImage
 
 from src.classes import SeriesData, StudyData
-from src.utils import SERIES_DESC_PATTERN
+from src.utils import (
+    CONTRAST_PHASES_DICT,
+    SERIES_DESC_PATTERN,
+)
 
 log = logging.getLogger("preprocess")
 
+# TODO: "thorax/osteo/colo/" part of "abdomen", "angio/aorta/aortic" part of arterial
+PATTERN_TO_PHASE = {
+    phrase: phase
+    for phase, phrases in CONTRAST_PHASES_DICT.items()
+    for phrase in phrases
+}
+
 CONTRAST_PHASES_PATTERN = re.compile(
-    r"|".join(
-        (
-            "abdomen",
-            "arterial",
-            "nephro",
-            "venous",
-            "thorax",
-            "angio",
-            "aorta",
-            "aortic",
-        )
-    ),
+    r"|".join(re.escape(p) for p in PATTERN_TO_PHASE),
     re.IGNORECASE,
 )
 
@@ -57,9 +56,6 @@ def preprocess_dicom_study(
     study_case.series = select_series_to_segment(
         series_files_map, event_dose_map=event_dose_map
     )
-
-    # a single dicom file is enough for finding out the age
-    # study_case.calculate_ct_relative_patient_age(list(series_files_map.values())[0][0])
 
     log.debug(f"found {len(study_case.series)} valid series for segmentation")
 
@@ -148,7 +144,7 @@ def filter_dicom_files(
         #   - also removes plane reconstructed images, 3D volume renderings
         # 3. file has SliceThickness -> removes non image type files - reports, protocols, etc.
         # 4. filter out based on regex pattern match on SeriesDescription -> final clean up for any remaining non-image files
-
+        # TODO: improve filtering based on last series_tags analysis in contrast_categories.ipynb
         series_desc = ds.get("SeriesDescription", "").lower()
         if "dose report" in series_desc:
             dose_report_files.append(file)
@@ -222,7 +218,7 @@ def select_series_to_segment(
             slice_thickness=float(dataset.get("SliceThickness", -1.0)),
             filepaths=filepaths,
             filepaths_num=len(filepaths),
-            # has_contrast="yes" if contrast_applied else "no",
+            # has_contrast=True if contrast_applied else False,
             irradiation_event_uid=dataset.get("IrradiationEventUID", "n/a"),
             convolution_kernel=convolution_kernel[0] if convolution_kernel else "n/a",
         )
@@ -230,13 +226,13 @@ def select_series_to_segment(
         contrast_applied = dataset.get("ContrastBolusAgent", None)
 
         if contrast_match := CONTRAST_PHASES_PATTERN.search(series_desc):
-            phase = contrast_match.group().lower()
+            phase = PATTERN_TO_PHASE.get(contrast_match.group().lower(), "unknown")
             series_data.contrast_phase = phase
             series_data.has_contrast = (
                 "yes" if contrast_applied and phase != "abdomen" else "no"
             )
         else:
-            series_data.contrast_phase = "other"
+            series_data.contrast_phase = "unknown"
             series_data.has_contrast = "n/a"
 
         series_by_contrast[series_data.contrast_phase].append(series_data)
@@ -264,7 +260,9 @@ def select_series_to_segment(
                 series_data.irradiation_event_uid, {}
             ).get("dlp", -1.0)
 
-    return {series.series_inst_uid: series for series in selected_series.values()}
+    series_name = f"{series_data.contrast_phase}_{series_data.slice_thickness}_{series_data.convolution_kernel}"
+
+    return {series_name: series for series in selected_series.values()}
 
 
 def extract_dose_values(

@@ -14,6 +14,52 @@ from src.labels import (
     TISSUE_HU_RANGES,
 )
 
+NATIVE_DESC_KEYWORDS = [
+    "abdomen",
+    "colo",
+    "hip",
+    "late",
+    "ldct",
+    "lung",
+    "osteo",
+    "pelvis",
+    "skelet",
+    "spine",
+    "spiral",
+    "thorabd",
+    "thorax",
+    "telo-femory",
+    "wholebody",
+]
+
+ARTERIAL_DESC_KEYWORDS = [
+    "arterial",
+    "aorta",
+    "aortic",
+    "angio",
+    "cta",
+    "chestpain",
+    "tavi",
+    "bestsyst",
+    "bestdiast",
+    "chestcasc",
+]
+
+VENOUS_DESC_KEYWORDS = [
+    "venous",
+]
+
+NEPHRO_DESC_KEYWORDS = [
+    "nephro",
+]
+
+CONTRAST_PHASES_DICT = {
+    "abdomen": NATIVE_DESC_KEYWORDS,
+    "arterial": ARTERIAL_DESC_KEYWORDS,
+    "venous": VENOUS_DESC_KEYWORDS,
+    "nephro": NEPHRO_DESC_KEYWORDS,
+}
+
 SERIES_DESC_PATTERN = re.compile(
     r"|".join(
         (
