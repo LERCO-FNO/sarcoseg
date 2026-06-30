@@ -103,6 +103,7 @@ class LabkeyAPI(APIWrapper):
         )
         log.info(f"INSERT {query_name}: {response.get('rowsAffected', 0)} rows")
 
+    # TODO: remove this function, currently not used, possibly no longer needed
     def exclude_finished_studies(self, cases: list[dict[str, Any]]) -> pd.DataFrame:
         """Query Labkey `CTSegmentationData` table with list of Study Instance UIDs and exclude those with segmentation results.
         Returns input list if the queried table has no data for matching values, ie no values for "rows" key.
@@ -150,6 +151,21 @@ class LabkeyAPI(APIWrapper):
             .reset_index(drop=True)
         ]
 
+    def _webdav_list_images(self, remote_path: str):
+        series_dirs = [
+            {"name": path["name"], "path": path["path"]}
+            for path in self._webdav_client.list(remote_path, get_info=True)
+        ]
+
+        series_image_paths = {
+            series["name"]: {
+                file_item["name"].removesuffix(".png"): file_item["path"]
+                for file_item in self._webdav_client.list(series["path"], get_info=True)
+            }
+            for series in series_dirs
+        }
+        return series_image_paths
+
     def upload_images(self, study_dir: str | Path) -> dict[str, dict[str, str]]:
         """
         Send segmentation images to Labkey remote through WebDAV. File path on remote has this format:
@@ -169,33 +185,24 @@ class LabkeyAPI(APIWrapper):
             dirs_exist_ok=True,
         )
 
-        remote_path = self._build_webdav_url("segmentation_images", tmp_dir.name)
+        remote_path = self._build_webdav_url(
+            "CTSegmentationData", "segmentation_images", tmp_dir.name
+        )  # "segmentation_images"
         try:
-            print(f"sending {tmp_dir} to {remote_path}")
+            log.debug(f"sending {tmp_dir} to {remote_path}")
             self._webdav_client.upload_directory(remote_path, tmp_dir)
+            shutil.rmtree(tmp_dir, ignore_errors=True)
         except Exception as exc:
-            print(exc)
+            log.exception(exc)
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
-        shutil.rmtree(tmp_dir)
-
-        series_dirs = [
-            {"name": path["name"], "path": path["path"]}
-            for path in self._webdav_client.list(remote_path, get_info=True)
-        ]
-
-        series_image_paths = {
-            series["name"]: {
-                file_item["name"].removesuffix(".png"): file_item["path"]
-                for file_item in self._webdav_client.list(series["path"], get_info=True)
-            }
-            for series in series_dirs
-        }
+        series_image_paths = self._webdav_list_images(remote_path)
 
         return series_image_paths
 
     def upload_zip_result(self, zip_path: Path) -> str:
         remote_path = self._build_webdav_url("segmentation_results", zip_path.name)
-        print(remote_path)
+        log.debug(remote_path)
         try:
             self._webdav_client.upload_file(remote_path, zip_path)
         except Exception as exc:

@@ -243,9 +243,9 @@ def main(args: argparse.Namespace):
                     f"case {study_case.participant}, study {study_case.study_inst_uid} has no DICOM data to send to labkey"
                 )
 
-            remote_image_paths = labkey_api.upload_images(output_study_dir)
+            # remote_image_paths = labkey_api.upload_images(output_study_dir)
             segmentation_result_list = segmentation_result._to_list_of_dicts(
-                remote_image_paths
+                None  # remote_image_paths
             )
             if segmentation_result_list:
                 labkey_api._insert_rows(
