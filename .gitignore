@@ -17,6 +17,7 @@ dcmtk/
 tests/
 testing.py
 notebooks/
+scripts/
 
 # ide dirs
 .vscode/
