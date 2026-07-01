@@ -76,23 +76,23 @@ def preprocess_dicom_study(
 
 
 def write_series_as_nifti(
-    dicom_directory, output_study_dir: Path, series_uids: dict[str, SeriesData]
+    dicom_directory, output_study_dir: Path, series_data: dict[str, SeriesData]
 ):
     reader = ImageSeriesReader()
 
-    for uid in series_uids:
-        log.debug(f"converting {uid} DICOM volume into NifTI")
+    for series in series_data.values():
+        log.debug(f"converting {series.series_name} DICOM volume into NifTI")
 
-        output_series_dir = output_study_dir.joinpath(uid)
+        output_series_dir = output_study_dir.joinpath(series.series_name)
         output_series_dir.mkdir(exist_ok=True, parents=True)
         output_filepath = output_series_dir.joinpath("input_ct_volume.nii.gz")
 
-        filenames = reader.GetGDCMSeriesFileNames(dicom_directory, uid)
+        filenames = reader.GetGDCMSeriesFileNames(dicom_directory, series.series_uid)
         reader.SetFileNames(filenames)
         image = reader.Execute()
         WriteImage(image, output_filepath)
 
-        log.info(f"written {uid} DICOM as NifTI")
+        log.info(f"written {series.series_name} DICOM as NifTI")
 
         if output_filepath.exists():
             log.debug(
@@ -222,6 +222,7 @@ def select_series_to_segment(
 
         series_data = SeriesData(
             series_uid=series_uid,
+            series_name="",
             series_description=series_desc,
             slice_thickness=float(dataset.get("SliceThickness", -1.0)),
             filepaths=filepaths,
@@ -243,6 +244,7 @@ def select_series_to_segment(
             series_data.contrast_phase = "unknown"
             series_data.has_contrast = "n/a"
 
+        series_data.series_name = f"{series_data.contrast_phase}_{series_data.slice_thickness}_{series_data.convolution_kernel}".lower()
         series_by_contrast[series_data.contrast_phase].append(series_data)
 
     selected_series = {
@@ -268,9 +270,7 @@ def select_series_to_segment(
                 series_data.irradiation_event_uid, {}
             ).get("dlp", -1.0)
 
-    series_name = f"{series_data.contrast_phase}_{series_data.slice_thickness}_{series_data.convolution_kernel}"
-
-    return {series_name: series for series in selected_series.values()}
+    return {series.series_name: series for series in selected_series.values()}
 
 
 def extract_dose_values(

@@ -17,7 +17,8 @@ log = logging.getLogger("classes")
 @dataclass
 class SeriesData:
     series_uid: str
-    series_description: str | None = None
+    series_name: str
+    series_description: str | None = field(default=None)
     filepaths: list[Path] = field(default_factory=list, repr=False)
     filepaths_num: int | None = field(default=None, repr=False)
     slice_thickness: float | None = field(default=None, repr=False)
