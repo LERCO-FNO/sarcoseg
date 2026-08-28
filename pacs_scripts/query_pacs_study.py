@@ -1,3 +1,4 @@
+from pprint import pprint
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -8,6 +9,8 @@ import polars as pl
 from pydicom import Dataset
 from pynetdicom import AE, sop_class
 from tqdm import tqdm
+from datetime import datetime, UTC
+from dateutil.relativedelta import relativedelta
 
 
 def main():
@@ -30,7 +33,7 @@ def main():
         separator=";",
         schema_overrides={
             "RODNE_CISLO": pl.String,
-            "PATIENTID": pl.String,
+            "PATIENT_ID": pl.String,
             "PACS_CISLO": pl.String,
         },
         null_values="-",
@@ -40,26 +43,24 @@ def main():
         raise ValueError("No data in .csv")
 
     ikis_data = (
-        ikis_data.rename({"RODNE_CISLO": "PATIENT_ID", "PATIENTID": "IKIS_ID"})
+        ikis_data.rename(
+            {
+                "RODNE_CISLO": "PATIENT_ID",
+                "PATIENT_ID": "IKIS_ID",
+                "NAZEV_VYSETRENI": "IKIS_STUDY_DESCRIPTION",
+                "STUDY_INSTANCE_UID": "IKIS_STUDY_INSTANCE_UID",
+                "PACS_CISLO": "IKIS_ACCESSION_NUMBER",
+            }
+        )
         .with_columns(
-            IKIS_DATETIME=pl.col("CAS_VYSETRENI").str.to_datetime("%d.%m.%Y %H:%M")
+            HELPER_INDEX=pl.int_range(0, pl.len()),
+            IKIS_DATETIME=pl.col("CAS_VYSETRENI").str.to_datetime("%d.%m.%Y %H:%M"),
         )
         .with_columns(
             IKIS_STUDY_DATE=pl.col("IKIS_DATETIME").dt.date(),
             IKIS_STUDY_TIME=pl.col("IKIS_DATETIME").dt.time(),
         )
-    ).select(
-        "PARTICIPANT",
-        "PATIENT_ID",
-        "IKIS_ID",
-        "IKIS_STUDY_DATE",
-        "IKIS_STUDY_TIME",
-        "NAZEV_VYSETRENI",
-        "PACS_CISLO",
     )
-
-    print(ikis_data)
-
     ae = AE(ae_title=aet)  # pacs_api.aet
     ae.add_requested_context(study_root_qr_model_find)
     assoc = ae.associate(pacs_ip, int(pacs_port), ae_title=aec)
@@ -71,11 +72,13 @@ def main():
     output_data: list[dict] = []
     for study in tqdm(ikis_data.to_dicts(), mininterval=5.0, maxinterval=5.0):
         # first try with actual PatientID
-        study_year = study["IKIS_STUDY_DATE"].year
+        ikis_study_date = study["IKIS_STUDY_DATE"]
+        date_range = f"{(ikis_study_date - relativedelta(years=1)).strftime('%Y%m%d')}-{(ikis_study_date + relativedelta(years=1)).strftime('%Y%m%d')}"
+
         ds = Dataset()
         ds.QueryRetrieveLevel = "STUDY"
         ds.PatientID = study["PATIENT_ID"]
-        ds.StudyDate = f"{study_year}0101-{study_year}1231"
+        ds.StudyDate = date_range
         ds.ModalitiesInStudy = "CT"
         ds.StudyTime = ""
         ds.AccessionNumber = ""
@@ -84,17 +87,15 @@ def main():
         ds.PatientName = ""
 
         study["responses"] = []
-        resp_datasets = cfind(assoc, ds, study_root_qr_model_find)
+        resp_datasets = cfind(assoc, ds, study_root_qr_model_find, ikis_study_date)
         study["responses"].extend(resp_datasets)
 
         # second try with IKIS ID
         ds.PatientID = study["IKIS_ID"]
-        resp_datasets = cfind(assoc, ds, study_root_qr_model_find)
+        resp_datasets = cfind(assoc, ds, study_root_qr_model_find, ikis_study_date)
         study["responses"].extend(resp_datasets)
 
         output_data.append(deepcopy(study))
-
-    # pprint(output_data)
 
     assoc.release()
     if assoc.is_released:
@@ -103,11 +104,12 @@ def main():
     response_dtypes = pl.List(
         pl.Struct(
             {
-                "ACCESSION_NUMBER": pl.Utf8,
-                "PACS_STUDY_DATE": pl.Utf8,
-                "PACS_STUDY_TIME": pl.Utf8,
-                "STUDY_DESCRIPTION": pl.Utf8,
-                "STUDY_INSTANCE_UID": pl.Utf8,
+                "PACS_ACCESSION_NUMBER": pl.Utf8,
+                "PACS_STUDY_DATE": pl.Date,
+                "PACS_STUDY_TIME": pl.Time,
+                "PACS_STUDY_DESCRIPTION": pl.Utf8,
+                "PACS_STUDY_INSTANCE_UID": pl.Utf8,
+                "DAYS_SINCE_IKIS_DATE": pl.Int64,
             }
         )
     )
@@ -120,25 +122,61 @@ def main():
     response_data = [rec["responses"] for rec in output_data]
     response_series = pl.Series("responses", response_data, dtype=response_dtypes)
     df_outer = pl.DataFrame(outer_records)
-    df = df_outer.with_columns(response_series)
-    df = df.explode("responses").unnest("responses")
-    print(df)
+    df = df_outer.with_columns(response_series).with_columns()
+    df = (
+        df.explode("responses")
+        .unnest("responses")
+        .group_by("HELPER_INDEX")
+        .agg(pl.all().sort_by("DAYS_SINCE_IKIS_DATE"))
+        .sort("HELPER_INDEX")
+        .explode(pl.exclude("HELPER_INDEX"))
+    )
+
+    # null out every value expect specific columns
+    df = df.with_columns(_RN=pl.int_range(0, pl.len()).over("HELPER_INDEX"))
+    cols_to_null = [
+        c
+        for c in df.columns
+        if c not in ("HELPER_INDEX", "DAYS_SINCE_IKIS_DATE", "_RN")
+    ]
+    df = df.with_columns(
+        [
+            pl.when(pl.col("_RN") == 0).then(pl.col(c)).otherwise(None).alias(c)
+            for c in cols_to_null
+        ]
+    ).drop("_RN")
+
+    print(df.select(pl.all()))
     df.write_csv("responses.csv", separator=";", null_value="-")
 
 
-def cfind(assoc, ds, qr_model):
+def cfind(assoc, ds, qr_model, ikis_study_date: datetime):
     response = assoc.send_c_find(ds, qr_model)
     success_resp = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
 
     default = "-"
     resp_datasets = [
         {
-            "PACS_STUDY_DATE": ds.get("StudyDate", default),
-            "PACS_STUDY_TIME": ds.get("StudyTime", default),
-            "ACCESSION_NUMBER": ds.get("AccessionNumber", default),
-            "STUDY_INSTANCE_UID": ds.get("StudyInstanceUID", default),
-            "STUDY_DESCRIPTION": ds.get("StudyDescription", default),
-            "PATIENT_NAME": ds.get("PatientName"),
+            "PACS_STUDY_DATE": datetime.strptime(ds.get("StudyDate", default), "%Y%m%d")
+            .astimezone()
+            .date(),
+            "PACS_STUDY_TIME": datetime.strptime(
+                ds.get("StudyTime", default), "%H%M%S.%f"
+            )
+            .replace(tzinfo=UTC)
+            .time(),
+            "PACS_ACCESSION_NUMBER": ds.get("AccessionNumber", default),
+            "PACS_STUDY_INSTANCE_UID": ds.get("StudyInstanceUID", default),
+            "PACS_STUDY_DESCRIPTION": ds.get("StudyDescription", default),
+            "PACS_PATIENT_NAME": ds.get("PatientName"),
+            "DAYS_SINCE_IKIS_DATE": abs(
+                (
+                    ikis_study_date
+                    - datetime.strptime(ds.get("StudyDate"), "%Y%m%d")
+                    .astimezone()
+                    .date()
+                ).days
+            ),
         }
         for ds in success_resp
     ]
