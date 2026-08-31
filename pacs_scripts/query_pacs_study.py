@@ -124,6 +124,7 @@ def main():
                 "PACS_STUDY_INSTANCE_UID": pl.Utf8,
                 "DAYS_SINCE_IKIS_DATE": pl.Int64,
                 "STUDY_UID_MATCH": pl.Boolean,
+                "STUDY_DATE_MATCH": pl.Boolean,
             }
         )
     )
@@ -161,7 +162,6 @@ def main():
             "PACS_STUDY_TIME",
             "PACS_STUDY_DESCRIPTION",
             "PACS_STUDY_INSTANCE_UID",
-            "STUDY_UID_MATCH",
         )
     ]
     df = df.with_columns(
@@ -169,7 +169,7 @@ def main():
             pl.when(pl.col("_RN") == 0).then(pl.col(c)).otherwise(None).alias(c)
             for c in cols_to_null
         ]
-    ).drop(["_RN", "IKIS_DATETIME"])
+    ).drop(["_RN", "CAS_VYSETRENI"])
 
     print(df)
     df.write_csv("responses.csv", separator=";", null_value="-")
@@ -203,6 +203,10 @@ def cfind(assoc, ds, qr_model, ikis_study_date, ikis_study_uid):
                 ).days
             ),
             "STUDY_UID_MATCH": ds.get("StudyInstanceUID") == ikis_study_uid,
+            "STUDY_DATE_MATCH": datetime.strptime(ds.get("StudyDate"), "%Y%m%d")
+            .astimezone()
+            .date()
+            == ikis_study_date,
         }
         for ds in success_resp
     ]
