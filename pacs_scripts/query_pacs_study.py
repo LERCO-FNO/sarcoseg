@@ -137,16 +137,26 @@ def main():
     cols_to_null = [
         c
         for c in df.columns
-        if c not in ("HELPER_INDEX", "DAYS_SINCE_IKIS_DATE", "_RN")
+        if c
+        not in (
+            "HELPER_INDEX",
+            "DAYS_SINCE_IKIS_DATE",
+            "_RN",
+            "PACS_ACCESSION_NUMBER",
+            "PACS_STUDY_DATE",
+            "PACS_STUDY_TIME",
+            "PACS_STUDY_DESCRIPTION",
+            "PACS_STUDY_INSTANCE_UID",
+        )
     ]
     df = df.with_columns(
         [
             pl.when(pl.col("_RN") == 0).then(pl.col(c)).otherwise(None).alias(c)
             for c in cols_to_null
         ]
-    ).drop("_RN")
+    ).drop(["_RN", "IKIS_DATETIME"])
 
-    print(df.select(pl.all()))
+    print(df)
     df.write_csv("responses.csv", separator=";", null_value="-")
 
 
