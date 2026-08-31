@@ -1,16 +1,17 @@
-from pprint import pprint
 import sys
 from copy import deepcopy
 from pathlib import Path
+from pprint import pprint
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from datetime import UTC, datetime
+
 import polars as pl
+from dateutil.relativedelta import relativedelta
 from pydicom import Dataset
 from pynetdicom import AE, sop_class
 from tqdm import tqdm
-from datetime import datetime, UTC
-from dateutil.relativedelta import relativedelta
 
 
 def main():
@@ -87,12 +88,24 @@ def main():
         ds.PatientName = ""
 
         study["responses"] = []
-        resp_datasets = cfind(assoc, ds, study_root_qr_model_find, ikis_study_date)
+        resp_datasets = cfind(
+            assoc,
+            ds,
+            study_root_qr_model_find,
+            ikis_study_date,
+            study["IKIS_STUDY_INSTANCE_UID"],
+        )
         study["responses"].extend(resp_datasets)
 
         # second try with IKIS ID
         ds.PatientID = study["IKIS_ID"]
-        resp_datasets = cfind(assoc, ds, study_root_qr_model_find, ikis_study_date)
+        resp_datasets = cfind(
+            assoc,
+            ds,
+            study_root_qr_model_find,
+            ikis_study_date,
+            study["IKIS_STUDY_INSTANCE_UID"],
+        )
         study["responses"].extend(resp_datasets)
 
         output_data.append(deepcopy(study))
@@ -110,6 +123,7 @@ def main():
                 "PACS_STUDY_DESCRIPTION": pl.Utf8,
                 "PACS_STUDY_INSTANCE_UID": pl.Utf8,
                 "DAYS_SINCE_IKIS_DATE": pl.Int64,
+                "STUDY_UID_MATCH": pl.Boolean,
             }
         )
     )
@@ -122,7 +136,7 @@ def main():
     response_data = [rec["responses"] for rec in output_data]
     response_series = pl.Series("responses", response_data, dtype=response_dtypes)
     df_outer = pl.DataFrame(outer_records)
-    df = df_outer.with_columns(response_series).with_columns()
+    df = df_outer.with_columns(response_series)
     df = (
         df.explode("responses")
         .unnest("responses")
@@ -147,6 +161,7 @@ def main():
             "PACS_STUDY_TIME",
             "PACS_STUDY_DESCRIPTION",
             "PACS_STUDY_INSTANCE_UID",
+            "STUDY_UID_MATCH",
         )
     ]
     df = df.with_columns(
@@ -160,7 +175,7 @@ def main():
     df.write_csv("responses.csv", separator=";", null_value="-")
 
 
-def cfind(assoc, ds, qr_model, ikis_study_date: datetime):
+def cfind(assoc, ds, qr_model, ikis_study_date, ikis_study_uid):
     response = assoc.send_c_find(ds, qr_model)
     success_resp = [msg_id for stat, msg_id in response if stat.Status == 0xFF00]
 
@@ -187,6 +202,7 @@ def cfind(assoc, ds, qr_model, ikis_study_date: datetime):
                     .date()
                 ).days
             ),
+            "STUDY_UID_MATCH": ds.get("StudyInstanceUID") == ikis_study_uid,
         }
         for ds in success_resp
     ]
