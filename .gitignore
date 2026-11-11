@@ -12,3 +12,7 @@ wheels/
 # input/output data directories/files
 in_data/
 out_data/
+*.dcm
+
+# dev directories/files
+dev/
