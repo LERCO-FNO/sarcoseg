@@ -1,8 +1,14 @@
 import tomllib
 from pathlib import Path
 from typing import Any
+
 import polars as pl
 from loguru import logger as log
+from SimpleITK import ImageSeriesReader, WriteImage
+
+from sarcosegv2.preprocess import SeriesMetadata
+
+
 def find_study_input(input_dir: str | Path, study_uid: str) -> Path | None:
     """
     Try to find input study data, expecting either a single `<study_uid>.nii.gz`, `<study_uid>.nii` or `<study_uid>/` with multiple `*.dcm` files.
@@ -87,3 +93,40 @@ def read_toml(path: Path | str) -> dict[str, Any]:
     return data
 
 
+def write_to_nifti(
+    study_dir: str | Path,
+    output_dir: str | Path,
+    series_metadatas: dict[str, SeriesMetadata],
+):
+    """
+    Writes DICOM series to NIfTI format.
+    """
+
+    study_dir = Path(study_dir)
+    output_dir = Path(output_dir)
+
+    reader = ImageSeriesReader()
+
+    for series in series_metadatas.values():
+        log.debug(f"Writing {series.name} volume as NIfTI")
+        output_filepath = output_dir.joinpath(series.name, "input_ct_volume.nii.gz")
+        output_filepath.parent.mkdir(exist_ok=True, parents=True)
+
+        if output_filepath.exists():
+            log.debug(f"Overwritting {output_filepath}")
+
+        filenames = reader.GetGDCMSeriesFileNames(study_dir, series.uid)
+        reader.SetFileNames(filenames)
+        image = reader.Execute()
+        try:
+            WriteImage(image, output_filepath)
+        except Exception as ex:
+            log.error(f"{ex}")
+            continue
+
+        log.debug(f"Written {series.name} into {output_filepath}")
+
+
+def write_metadata(self):
+    """ """
+    NotImplementedError
