@@ -1,7 +1,8 @@
 import re
 from collections import defaultdict
 from collections.abc import Mapping
-from dataclasses import dataclass, fields
+
+# from dataclasses import dataclass, field, fields
 from pathlib import Path
 from statistics import mean
 
@@ -9,6 +10,7 @@ from loguru import logger as log
 from pydicom import Dataset, dcmread
 from pydicom.multival import MultiValue
 
+from sarcosegv2.classes import SeriesMetadata, StudyMetadata
 from sarcosegv2.series_filter import (
     CONTRAST_PHASE_DESC_PATTERNS,
     filter_cfind_series_responses,

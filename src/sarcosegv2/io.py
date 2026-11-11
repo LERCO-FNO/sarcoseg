@@ -6,8 +6,8 @@ import polars as pl
 from loguru import logger as log
 from SimpleITK import ImageSeriesReader, WriteImage
 
+from sarcosegv2.classes import SeriesMetadata
 from sarcosegv2.types import StrPath
-from sarcosegv2.preprocess import SeriesMetadata
 
 
 def find_study_input(input_dir: StrPath, study_uid: str) -> Path | None:
