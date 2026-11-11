@@ -67,8 +67,8 @@ def read_study_cases_list(path: Path) -> pl.DataFrame:
     else:
         df = pl.read_json(path)
 
-    condition = (pl.col("StudyInstanceUID").is_not_null()) & (
-        pl.col("StudyInstanceUID").str.len_bytes() > 0
+    condition = (pl.col("study_uid").is_not_null()) & (
+        pl.col("study_uid").str.len_bytes() > 0
     )
     removed_rows = df.remove(condition)
     df = df.filter(condition)
