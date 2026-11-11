@@ -1,8 +1,6 @@
 import re
 from collections import defaultdict
 from collections.abc import Mapping
-
-# from dataclasses import dataclass, field, fields
 from pathlib import Path
 from statistics import mean
 
@@ -11,114 +9,65 @@ from pydicom import Dataset, dcmread
 from pydicom.multival import MultiValue
 
 from sarcosegv2.classes import SeriesMetadata, StudyMetadata
+from sarcosegv2.io import write_to_nifti
 from sarcosegv2.series_filter import (
     CONTRAST_PHASE_DESC_PATTERNS,
     filter_cfind_series_responses,
 )
+from sarcosegv2.types import StrPath
 from sarcosegv2.utils import find_dicoms
 
 
-class DicomPreprocessor:
-    def __init__(self, preprocess_dose_report: bool = False):
-        self.preprocess_dose_report = preprocess_dose_report
+def preprocess_study(
+    self,
+    study_dir: StrPath,
+    output_dir: StrPath,
+    study_metadata: StudyMetadata,
+):
+    """
+    Preprocesses DICOM study and writes each selected series as NIfTI.
+    Output study directory structure:
+        - .../study_uid/series_description1/...
+        - .../study_uid/series_description2/...
+        - ...
 
-    def preprocess_study(self, study_dir: str | Path, output_dir: str | Path):
-        """
-        Preprocesses DICOM study and writes each selected series as NIfTI.
-        Output study directory structure:
-            - .../study_uid/series_description1/...
-            - .../study_uid/series_description2/...
-            - ...
+    Parameters
+    ----------
+    study_dir : StrPath
+        Directory path to search for study DICOM files.
+    output_dir : StrPath
+        Directory path to write selected series.
+    """
+    study_dir = Path(study_dir)
+    output_dir = Path(output_dir)
 
-        Parameters
-        ----------
-        study_dir : str | Path
-            Directory path to search for study DICOM files.
-        output_dir : str | Path
-            Directory path to write selected series.
-        """
-        study_dir = Path(study_dir)
-        output_dir = Path(output_dir)
+    if study_metadata:
+        log.info(
+            f"Preprocessing DICOM study case {study_metadata.participant} (uid: {study_metadata.uid}) at `{study_dir}`"
+        )
+    else:
+        log.info(f"Preprocessing unknown DICOM study case at `{study_dir}`")
 
-        dicom_files = find_dicoms(study_dir)
-        if not dicom_files:
-            log.warning(f"No DICOM files in `{study_dir}`")
-            return
+    dicom_files = find_dicoms(study_dir)
+    if not dicom_files:
+        log.warning(f"No DICOM files in `{study_dir}`")
+        return
 
-        dicom_files, dicom_dir = dicom_files
-        log.debug(f"Preprocessing DICOM study, files at `{dicom_dir}`")
+    dicom_files, dicom_dir = dicom_files
+    log.debug(f"Preprocessing DICOM study, files at `{dicom_dir}`")
 
-        datasets = [
-            dcmread(
-                fp,
-                # specific_tags=[
-                #     "PatientID",
-                #     "StudyInstanceUID",
-                #     "SeriesInstanceUID",
-                #     "SeriesDescription",
-                #     "ImageType",
-                #     "SliceThickness",
-                #     "ConvolutionKernel",
-                #     "BodyPartExamined",
-                # ],
-                stop_before_pixels=True,
-            )
-            for fp in dicom_files
-        ]
+    datasets = [dcmread(fp, stop_before_pixels=True) for fp in dicom_files]
 
-        datasets_by_uid, dose_datasets = filter_cfind_series_responses(datasets)
-        dose_by_irrad_uid = extract_ct_dose(dose_datasets) if dose_datasets else None
+    datasets_by_uid, dose_datasets = filter_cfind_series_responses(datasets)
+    dose_by_irrad_uid = extract_ct_dose(dose_datasets) if dose_datasets else None
 
-        if not dose_by_irrad_uid:
-            log.warning(f"No dose data found for study at `{study_dir}`")
+    if not dose_by_irrad_uid:
+        log.warning(f"No dose data found for study at `{study_dir}`")
 
-        series_metadatas = extract_series_metadata(datasets_by_uid, dose_by_irrad_uid)
-        selected_series = select_series_to_segment(series_metadatas)
+    series_metadatas = extract_series_metadata(datasets_by_uid, dose_by_irrad_uid)
+    study_metadata.series = select_series_to_segment(series_metadatas)
 
-        return selected_series
-
-
-@dataclass(repr=False)
-class SeriesMetadata:
-    uid: str
-    name: str
-    description: str | None = None
-    contrast_phase: str | None = None
-    series_contrast_type: str | None = None
-    convolution_kernel: str | None = None
-    slice_thickness: float | None = None
-    slice_count: int | None = None
-    irradiation_event_uid: str | None = None
-    kilo_voltage_peak: float | None = None
-    mean_tube_current: float | None = None
-    mean_ctdi_vol: float | None = None
-    dose_length_product: float | None = None
-
-    def __repr__(self):
-        return f"""
-SeriesMetadata(
-    name={self.name!r},
-    description={self.description!r},
-    contrast_applied={self.series_contrast_type!r},
-    slice_thickness={self.slice_thickness!r}
-)
-        """
-
-    def __format__(self, spec: str) -> str:
-        if spec == "v":
-            parts = "\n\t".join(
-                f"{f.name}={getattr(self, f.name)!r}" for f in fields(self)
-            )
-            return f"{type(self).__name__}({parts})"
-        return repr(self)
-
-    def add_dose(self, dose: dict[str, float]):
-        """
-        Adds dose values meanCTDIvol and Dose Length Product (DLP) to SeriesMetadata.
-        Value -1.0 indicates a missing value in Dose Report Structure Report DICOM file.
-        """
-        self.mean_ctdi_vol = dose.get("mean_ctdi_vol", -1.0)
-        self.dose_length_product = dose.get("dose_length_product", -1.0)
+    write_to_nifti(study_dir, output_dir, study_metadata.series)
 
 
 # Restructure map for the purpose of guessing contrast phase by pattern matching.
