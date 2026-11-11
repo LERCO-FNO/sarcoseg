@@ -6,10 +6,11 @@ import polars as pl
 from loguru import logger as log
 from SimpleITK import ImageSeriesReader, WriteImage
 
+from sarcosegv2.types import StrPath
 from sarcosegv2.preprocess import SeriesMetadata
 
 
-def find_study_input(input_dir: str | Path, study_uid: str) -> Path | None:
+def find_study_input(input_dir: StrPath, study_uid: str) -> Path | None:
     """
     Try to find input study data, expecting either a single `<study_uid>.nii.gz`, `<study_uid>.nii` or `<study_uid>/` with multiple `*.dcm` files.
     Uses the whole `StudyInstanceUID` DICOM tag value as pattern.
@@ -94,8 +95,8 @@ def read_toml(path: Path | str) -> dict[str, Any]:
 
 
 def write_to_nifti(
-    study_dir: str | Path,
-    output_dir: str | Path,
+    study_dir: StrPath,
+    output_dir: StrPath,
     series_metadatas: dict[str, SeriesMetadata],
 ):
     """

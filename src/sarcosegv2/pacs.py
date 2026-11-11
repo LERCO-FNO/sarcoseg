@@ -11,6 +11,7 @@ from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelMove
 
 from sarcosegv2.io import read_toml
 from sarcosegv2.series_filter import filter_cfind_series_responses
+from sarcosegv2.types import StrPath
 
 DEFAULT_CONFIG_FILE = Path("./default_config.toml").absolute()
 REQUIRED_PACS_PORT_CONFIG_KEYS = ("port", "store_port")
@@ -50,7 +51,7 @@ class PacsAccessor:
         called_ae: str,
         local_ip: str,
         store_port: int,
-        download_dir: str | Path = "./download",
+        download_dir: StrPath = "./download",
     ):
         self.ip = ip
         self.port = port
@@ -61,7 +62,7 @@ class PacsAccessor:
         self.download_dir = Path(download_dir)
 
     @classmethod
-    def from_config(cls, config_file: str | Path | None = None) -> Self:
+    def from_config(cls, config_file: StrPath | None = None) -> Self:
         config_file = Path(config_file or DEFAULT_CONFIG_FILE)
         log.debug(f"Initializing {cls.__name__} from `{config_file}`")
 
@@ -149,7 +150,7 @@ class PacsAccessor:
     def move_series(
         self,
         studies: dict[str, list[str]],
-        output_directory: str | Path = "./download",
+        output_directory: StrPath = "./download",
     ):
         """
         Send C-MOVE requests for at QueryRetrieveLevel=SERIES given a map of study_uid: list_of_series_uid and store incoming dataset objects.
@@ -159,7 +160,7 @@ class PacsAccessor:
         ----------
         studies : dict(str, list(str))
             Map of study_uid: list_of_series_uid to move.
-        output_directory : str | Path, default: "./download"
+        output_directory : StrPath, default: "./download"
             Base local storage directory path.
 
         Returns
