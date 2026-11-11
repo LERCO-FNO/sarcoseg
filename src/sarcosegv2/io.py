@@ -26,7 +26,6 @@ def find_study_input(input_dir: str | Path, study_uid: str) -> Path | None:
     found = Path(input_dir).glob(study_uid + "*")
 
     for p in found:
-        print(p, p.name)
         if p.is_file() and ".nii" in p.name:
             log.debug(f"Found study as NifTI file: `{p}`")
             return p
