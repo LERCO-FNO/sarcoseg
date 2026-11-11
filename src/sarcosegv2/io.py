@@ -113,7 +113,7 @@ def write_to_nifti(
         output_filepath.parent.mkdir(exist_ok=True, parents=True)
 
         if output_filepath.exists():
-            log.debug(f"Overwritting {output_filepath}")
+            log.debug(f"Overwritting `{output_filepath}`")
 
         filenames = reader.GetGDCMSeriesFileNames(study_dir, series.uid)
         reader.SetFileNames(filenames)
@@ -124,7 +124,7 @@ def write_to_nifti(
             log.error(f"{ex}")
             continue
 
-        log.debug(f"Written {series.name} into {output_filepath}")
+        log.debug(f"Written {series.name} into `{output_filepath}`")
 
 
 def write_metadata(self):

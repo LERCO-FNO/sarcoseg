@@ -63,7 +63,7 @@ class PacsAccessor:
     @classmethod
     def from_config(cls, config_file: str | Path | None = None) -> Self:
         config_file = Path(config_file or DEFAULT_CONFIG_FILE)
-        log.debug(f"Initializing {cls.__name__} from {config_file}")
+        log.debug(f"Initializing {cls.__name__} from `{config_file}`")
 
         config = read_toml(config_file).get("pacs", None)
         if not config:

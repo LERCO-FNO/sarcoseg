@@ -13,7 +13,7 @@ def test_images_dir():
     path = Path("./tests/data/")
     if not path.exists():
         pytest.fail(
-            f"Local test image directory(ies) not found: {path}, "
+            f"Local test image directory(ies) not found at `{path}`, "
             "expected to find <project_dir/dev/<study>"
         )
 

@@ -68,7 +68,7 @@ def get_args():
 def validate_study_cases_file(path_str: str) -> Path:
     path = Path(path_str.lower())
     if not path.exists():
-        raise argparse.ArgumentTypeError(f"File not found: {path}")
+        raise argparse.ArgumentTypeError(f"File not found at `{path}`")
 
     if path.suffix not in {".csv", ".json"}:
         raise argparse.ArgumentTypeError(
