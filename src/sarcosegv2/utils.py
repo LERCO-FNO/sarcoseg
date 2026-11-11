@@ -10,7 +10,8 @@ def find_dicoms(dicom_dir: Path) -> tuple[list[Path], Path] | None:
     dicom_dir : Path
         Path to DICOM study directory.
 
-    Returns:
+    Returns
+    -------
     paths : list(Path)
         List of discovered DICOM file paths, otherwise `None`.
     root : Path
