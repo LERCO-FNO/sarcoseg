@@ -1,0 +1,90 @@
+import tomllib
+from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
+import polars as pl
+from loguru import logger as log
+def find_study_input(input_dir: str | Path, study_uid: str) -> Path | None:
+    """
+    Try to find input study data, expecting either a single `<study_uid>.nii.gz`, `<study_uid>.nii` or `<study_uid>/` with multiple `*.dcm` files.
+    Uses the whole `StudyInstanceUID` DICOM tag value as pattern.
+
+    Parameters
+    ---------
+    input_dir : Path
+        Directory path containing input study files.
+        Expects NifTI file .../<uid>.nii.gz, .../<uid>.nii or DICOM directory .../<uid>/.
+    study_uid : str
+        Identifying pattern to find input study.
+
+    Returns
+    -------
+    Path or None
+        Path pointing to the NifTI file or directory. `None` if not found.
+    """
+
+    found = Path(input_dir).glob(study_uid + "*")
+
+    for p in found:
+        print(p, p.name)
+        if p.is_file() and ".nii" in p.name:
+            log.debug(f"Found study as NifTI file: `{p}`")
+            return p
+        if p.is_dir() and len(list(p.rglob("*"))) > 0:
+            log.debug(f"Found study as DICOM directory: `{p}`")
+            return p
+        else:
+            log.warning(f"No study file/directory found for {study_uid}")
+
+
+def read_study_cases_list(path: Path) -> pl.DataFrame:
+    """
+    Read study cases file, filter rows for non-empty StudyInstanceUID column values.
+    Expects at least one column (CSV) or key (JSON) named `StudyInstanceUID` with non-empty value.
+
+    Returns
+    -------
+    polars.DataFrame
+
+    Raises
+    ------
+    NoDataError
+        Input CSV file has no data.
+    ComputeError
+        Input JSON file has no data.
+    PolarsError
+        Filtered dataframe has no remaining valid StudyInstanceUID rows, caused by only empty strings in CSV rows or JSON key-value pairs resulting in dataframe length equaling 0.
+    """
+
+    print("READING STUDY CASE FILE")
+    if path.suffix == ".csv":
+        df = pl.read_csv(path, separator=";", has_header=True, raise_if_empty=True)
+    else:
+        df = pl.read_json(path)
+
+    condition = (pl.col("StudyInstanceUID").is_not_null()) & (
+        pl.col("StudyInstanceUID").str.len_bytes() > 0
+    )
+    removed_rows = df.remove(condition)
+    df = df.filter(condition)
+
+    if not removed_rows.is_empty():
+        log.warning(f"Filtered out {len(removed_rows)} row(s)")
+        log.debug(f"Filtered out rows:\n{removed_rows}")
+
+    if df.is_empty():
+        log.error(
+            "Study cases file has no remaining rows after filtering for non-empty StudyInstanceUID values"
+        )
+        raise pl.exceptions.PolarsError(
+            f"Dataframe has no valid StudyInstanceUID values, file: `{path}`"
+        )
+    return df
+
+
+def read_toml(path: Path | str) -> dict[str, Any]:
+    with open(path, mode="rb") as file:
+        data = tomllib.load(file)
+    return data
+
+
