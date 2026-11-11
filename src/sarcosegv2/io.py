@@ -1,5 +1,4 @@
 import tomllib
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 import polars as pl
@@ -44,6 +43,7 @@ def read_study_cases_list(path: Path) -> pl.DataFrame:
     Returns
     -------
     polars.DataFrame
+        DataFrame with empty or `null` values filtered out.
 
     Raises
     ------
@@ -76,7 +76,7 @@ def read_study_cases_list(path: Path) -> pl.DataFrame:
             "Study cases file has no remaining rows after filtering for non-empty StudyInstanceUID values"
         )
         raise pl.exceptions.PolarsError(
-            f"Dataframe has no valid StudyInstanceUID values, file: `{path}`"
+            f"DataFrame has no StudyInstanceUID column, file: `{path}`"
         )
     return df
 
