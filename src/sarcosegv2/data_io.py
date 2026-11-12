@@ -45,7 +45,7 @@ def find_study_input(input_dir: StrPath, study_uid: str) -> Path | None:
 def read_study_cases_list(path: Path) -> pl.DataFrame:
     """
     Read study cases file, filter rows for non-empty StudyInstanceUID column values.
-    Expects at least one column (CSV) or key (JSON) named `StudyInstanceUID` with non-empty value.
+    Expects at least one column (CSV) or key (JSON) named `study_uid` with non-empty value.
 
     Returns
     -------
@@ -59,7 +59,8 @@ def read_study_cases_list(path: Path) -> pl.DataFrame:
     ComputeError
         Input JSON file has no data.
     PolarsError
-        Filtered dataframe has no remaining valid StudyInstanceUID rows, caused by only empty strings in CSV rows or JSON key-value pairs resulting in dataframe length equaling 0.
+        Filtered dataframe has no remaining valid study_uid rows,
+        caused by only empty strings in CSV rows or JSON key-value pairs resulting in dataframe length equaling 0.
     """
 
     print("READING STUDY CASE FILE")
@@ -68,6 +69,7 @@ def read_study_cases_list(path: Path) -> pl.DataFrame:
     else:
         df = pl.read_json(path)
 
+    df = df.rename(str.lower)
     condition = (pl.col("study_uid").is_not_null()) & (
         pl.col("study_uid").str.len_bytes() > 0
     )
@@ -75,7 +77,9 @@ def read_study_cases_list(path: Path) -> pl.DataFrame:
     df = df.filter(condition)
 
     if not removed_rows.is_empty():
-        log.warning(f"Filtered out {len(removed_rows)} row(s)")
+        log.warning(
+            f"Filtered out {len(removed_rows)} row(s) with empty/null study_uid field"
+        )
         log.debug(f"Filtered out rows:\n{removed_rows}")
 
     if df.is_empty():
