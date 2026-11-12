@@ -4,7 +4,7 @@ from pathlib import Path
 
 from loguru import logger as log
 
-from sarcosegv2.io import read_study_cases_list
+from sarcosegv2.data_io import read_study_cases_list
 
 
 def get_args():

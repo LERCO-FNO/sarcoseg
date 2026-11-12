@@ -1,6 +1,6 @@
 import pytest
 
-from sarcosegv2.io import find_study_input
+from sarcosegv2.data_io import find_study_input
 
 DICOM_DIR = "1.2"
 NIFTI_FILE = "1.3"

@@ -6,7 +6,7 @@ import polars as pl
 from loguru import logger as log
 from SimpleITK import ImageSeriesReader, WriteImage
 
-from sarcosegv2.classes import SeriesMetadata
+from sarcosegv2.data_models import SeriesMetadata
 from sarcosegv2.types import StrPath
 
 

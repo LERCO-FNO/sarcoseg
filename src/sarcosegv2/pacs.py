@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Self
+from typing import Self
 
 from loguru import logger as log
 from pydicom import Dataset
@@ -9,7 +9,7 @@ from pynetdicom.association import Association
 # pyrefly: ignore[missing-module-attribute]
 from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelMove
 
-from sarcosegv2.io import read_toml
+from sarcosegv2.data_io import read_toml
 from sarcosegv2.series_filter import filter_cfind_series_responses
 from sarcosegv2.types import StrPath
 
