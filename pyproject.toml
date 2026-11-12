@@ -7,20 +7,17 @@ authors = [{ name = "Vojtěch Benda", email = "vojtech.benda@fno.com" }]
 license = "Apache-2.0"
 requires-python = ">=3.14"
 dependencies = [
-    "argparse>=1.4.0",
-    "labkey>=4.4.1",
-    "loguru>=0.7.3",
-    "polars>=2.1.0",
-    "pydicom>=3.0.2",
-    "pynetdicom>=3.0.4",
-    "simpleitk>=2.5.6",
+  "argparse>=1.4.0",
+  "labkey>=4.4.1",
+  "loguru>=0.7.3",
+  "polars>=2.1.0",
+  "pydicom>=3.0.2",
+  "pynetdicom>=3.0.4",
+  "simpleitk>=2.5.6",
 ]
 
 [tool.pyrefly]
-project-includes = [
-    "**/*.py*",
-    "**/*.ipynb",
-]
+project-includes = ["**/*.py*", "**/*.ipynb"]
 
 # example script path
 [project.scripts]
