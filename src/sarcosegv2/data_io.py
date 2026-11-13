@@ -42,7 +42,7 @@ def find_study_input(input_dir: StrPath, study_uid: str) -> Path | None:
             log.warning(f"No study file/directory found for {study_uid}")
 
 
-def read_study_cases_list(path: Path) -> pl.DataFrame:
+def read_study_cases_list(path: StrPath) -> pl.DataFrame:
     """
     Read study cases file, filter rows for non-empty StudyInstanceUID column values.
     Expects at least one column (CSV) or key (JSON) named `study_uid` with non-empty value.
@@ -62,12 +62,13 @@ def read_study_cases_list(path: Path) -> pl.DataFrame:
         Filtered dataframe has no remaining valid study_uid rows,
         caused by only empty strings in CSV rows or JSON key-value pairs resulting in dataframe length equaling 0.
     """
-
-    print("READING STUDY CASE FILE")
+    path = Path(path)
     if path.suffix == ".csv":
         df = pl.read_csv(path, separator=";", has_header=True, raise_if_empty=True)
-    else:
+    elif path.suffix == ".json":
         df = pl.read_json(path)
+    else:
+        raise OSError(f"Expected `.json` or `.csv` file, got {path.name}")
 
     df = df.rename(str.lower)
     condition = (pl.col("study_uid").is_not_null()) & (
