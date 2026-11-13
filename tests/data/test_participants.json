@@ -1,0 +1,22 @@
+[
+  {
+    "Participant": "PT01",
+    "study_uid": "1.2.3",
+    "PATIENT_HEIGHT": 170
+  },
+  {
+    "Participant": "PT02",
+    "study_uid": "1.2.4",
+    "PATIENT_HEIGHT": 180
+  },
+  {
+    "Participant": "PT03",
+    "study_uid": "1.2.5",
+    "PATIENT_HEIGHT": null
+  },
+  {
+    "Participant": "PT04",
+    "study_uid": "",
+    "PATIENT_HEIGHT": 190
+  }
+]
