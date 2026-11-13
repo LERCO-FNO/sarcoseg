@@ -13,7 +13,7 @@ from sarcosegv2.series_filter import filter_cfind_series_responses
 
 def test_extract_series_metadata(dicom_datasets):
     filtered_datasets, _ = filter_cfind_series_responses(dicom_datasets)
-    series_metadatas = extract_series_metadata(filtered_datasets)
+    series_metadatas, _ = extract_series_metadata(filtered_datasets)
 
     expected_contrast_types = ("native", "contrast")
     assert all([s.contrast_type in expected_contrast_types for s in series_metadatas])
@@ -52,6 +52,7 @@ def test_compute_mean_tube_current():
     datasets[1].XRayTubeCurrent = ""
     bad_mean, bad_currents = extract_tube_currents(datasets)
     assert bad_mean == 6.5, f"Expected mean = 6.5, got {bad_mean}"
+
     # test correct filtering of None/"" in raw XRayTubeCurrent value
     assert len(bad_currents) != len(datasets), f"Expected 8, got {len(bad_currents)}"
 

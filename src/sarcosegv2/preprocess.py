@@ -17,6 +17,9 @@ from sarcosegv2.series_filter import (
 )
 from sarcosegv2.utils import find_dicoms
 
+type CurrentBySeries = defaultdict[str, Mapping[str, float]]
+type DoseByIrradUID = Mapping[str, Mapping[str, float | int]]
+
 
 def preprocess_study(
     study_dir: StrPath,
@@ -63,7 +66,9 @@ def preprocess_study(
     if not dose_by_irrad_uid:
         log.warning(f"No dose data found for study at `{study_dir}`")
 
-    series_metadatas = extract_series_metadata(datasets_by_uid, dose_by_irrad_uid)
+    series_metadatas, currents_by_series = extract_series_metadata(
+        datasets_by_uid, dose_by_irrad_uid
+    )
     study_metadata.series = select_series_to_segment(series_metadatas)
 
     write_to_nifti(study_dir, output_dir, study_metadata.series)
@@ -96,8 +101,8 @@ CONTRAST_PHASES_PATTERN = re.compile(
 
 def extract_series_metadata(
     datasets_by_series_uid: Mapping[str, list[Dataset]],
-    dose_by_irrad_uid: dict[str, dict[str, float]] | None = None,
-) -> list[SeriesMetadata]:
+    dose_by_irrad_uid: DoseByIrradUID | None = None,
+) -> tuple[list[SeriesMetadata], CurrentBySeries]:
     """
     Select the highest-resolution series (thinnest slices and highest slice count) per contrast phase.
 
@@ -112,6 +117,7 @@ def extract_series_metadata(
         List of candidate `SeriesMetadata` instances.
     """
     series_metadatas = []
+    currents_by_series: CurrentBySeries = defaultdict(dict[str, float])
     for series_uid, datasets in datasets_by_series_uid.items():
         ds = datasets[0]
 
@@ -147,6 +153,8 @@ def extract_series_metadata(
             mean_tube_current=mean_currents,
         )
 
+        currents_by_series[series_meta.series_name] = currents_by_instance
+
         if dose_by_irrad_uid and series_meta.irradiation_event_uid:
             if dose := dose_by_irrad_uid.get(series_meta.irradiation_event_uid, None):
                 series_meta.add_dose(dose)
@@ -158,7 +166,7 @@ def extract_series_metadata(
         log.debug(f"Constructed {series_meta:v}")
         series_metadatas.append(series_meta)
 
-    return series_metadatas
+    return series_metadatas, currents_by_series
 
 
 def select_series_to_segment(
