@@ -126,17 +126,17 @@ def extract_series_metadata(
         # - abdomen (native), arterial, nephrous or venous
         # more here: https://github.com/LERCO-FNO/sarcoseg/blob/0561819c0d98d3ac9009b7ae35154b1f8803be12/src/preprocessing.py#L237
         # and here: https://github.com/LERCO-FNO/sarcoseg/blob/0561819c0d98d3ac9009b7ae35154b1f8803be12/src/utils.py#L17
-        series_contrast_type, contrast_phase = resolve_contrast_phase(ds)
+        contrast_type, contrast_phase = resolve_contrast_phase(ds)
 
         slice_thickness = float(ds.get("SliceThickness", -1.0))
         series_name = f"{contrast_phase}_{slice_thickness}_{convolution_kernel}"
 
         series_meta = SeriesMetadata(
-            uid=series_uid,
-            name=series_name,
+            series_uid=series_uid,
+            series_name=series_name,
             description=series_desc,
             contrast_phase=contrast_phase,
-            series_contrast_type=series_contrast_type,
+            contrast_type=contrast_type,
             convolution_kernel=convolution_kernel,
             slice_thickness=float(ds.get("SliceThickness", -1.0)),
             slice_count=len(datasets),
@@ -150,7 +150,7 @@ def extract_series_metadata(
                 series_meta.add_dose(dose)
             else:
                 log.warning(
-                    f"Series {series_meta.name} (uid: {series_meta.uid}) has no dose data in Dose Report"
+                    f"Series {series_meta.series_name} (uid: {series_meta.series_uid}) has no dose data in Dose Report"
                 )
 
         log.debug(f"Constructed {series_meta:v}")
@@ -190,7 +190,7 @@ def select_series_to_segment(
         )
         for phase, series_list in series_by_contrast.items()
     }
-    return {series.name: series for series in selected_series.values()}
+    return {series.series_name: series for series in selected_series.values()}
 
 
 def resolve_contrast_phase(ds: Dataset) -> tuple[str, str]:

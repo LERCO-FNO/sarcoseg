@@ -66,11 +66,11 @@ StudyMetadata(
 
 @dataclass(repr=False)
 class SeriesMetadata:
-    uid: str
-    name: str
+    series_uid: str
+    series_name: str
     description: str | None = None
     contrast_phase: str | None = None
-    series_contrast_type: str | None = None
+    contrast_type: str | None = None
     convolution_kernel: str | None = None
     slice_thickness: float | None = None
     slice_count: int | None = None
@@ -83,9 +83,9 @@ class SeriesMetadata:
     def __repr__(self):
         return f"""
 SeriesMetadata(
-    name={self.name!r},
+    name={self.series_name!r},
     description={self.description!r},
-    contrast_applied={self.series_contrast_type!r},
+    contrast_applied={self.contrast_type!r},
     slice_thickness={self.slice_thickness!r}
 )
         """
@@ -107,11 +107,11 @@ SeriesMetadata(
             )
 
         return cls(
-            uid=map["uid"],
-            name=map["name"],
+            series_uid=map["uid"],
+            series_name=map["name"],
             description=map.get("description"),
             contrast_phase=map.get("contrast_phase"),
-            series_contrast_type=map.get("series_contrast_type"),
+            contrast_type=map.get("contrast_type"),
             convolution_kernel=map.get("convolution_kernel"),
             slice_thickness=map.get("slice_thickness"),
             slice_count=map.get("slice_count"),

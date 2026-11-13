@@ -114,14 +114,16 @@ def write_to_nifti(
     reader = ImageSeriesReader()
 
     for series in series_metadatas.values():
-        log.debug(f"Writing {series.name} volume as NIfTI")
-        output_filepath = output_dir.joinpath(series.name, "input_ct_volume.nii.gz")
+        log.debug(f"Writing {series.series_name} volume as NIfTI")
+        output_filepath = output_dir.joinpath(
+            series.series_name, "input_ct_volume.nii.gz"
+        )
         output_filepath.parent.mkdir(exist_ok=True, parents=True)
 
         if output_filepath.exists():
             log.debug(f"Overwritting `{output_filepath}`")
 
-        filenames = reader.GetGDCMSeriesFileNames(study_dir, series.uid)
+        filenames = reader.GetGDCMSeriesFileNames(study_dir, series.series_uid)
         reader.SetFileNames(filenames)
         image = reader.Execute()
         try:
@@ -130,7 +132,7 @@ def write_to_nifti(
             log.error(f"{ex}")
             continue
 
-        log.debug(f"Written {series.name} into `{output_filepath}`")
+        log.debug(f"Written {series.series_name} into `{output_filepath}`")
 
 
 def write_metadata(self):

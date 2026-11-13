@@ -9,9 +9,7 @@ def test_extract_series_metadata(dicom_datasets):
     series_metadatas = extract_series_metadata(filtered_datasets)
 
     expected_contrast_types = ("native", "contrast")
-    assert all(
-        [s.series_contrast_type in expected_contrast_types for s in series_metadatas]
-    )
+    assert all([s.contrast_type in expected_contrast_types for s in series_metadatas])
 
 
 def test_filter_datasets(dicom_datasets):
