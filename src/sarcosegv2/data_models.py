@@ -14,6 +14,16 @@ class StudyMetadata:
     patient_height: float | int | None = field(default=None, compare=False)
     series: dict[str, SeriesMetadata] = field(default_factory=dict, compare=False)
 
+    def __repr__(self):
+        return f"""
+StudyMetadata(
+    participant={self.participant!r},
+    study_uid={self.study_uid!r},
+    patient_height={self.patient_height!r},
+    series={tuple(self.series.keys())}
+)
+        """
+
     @classmethod
     def from_dataframe(cls, df: pl.DataFrame):
         """
