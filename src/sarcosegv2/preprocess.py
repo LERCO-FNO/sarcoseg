@@ -9,7 +9,7 @@ from pydicom import Dataset, dcmread
 from pydicom.multival import MultiValue
 
 from sarcosegv2._types import StrPath
-from sarcosegv2.data_io import write_to_nifti
+from sarcosegv2.data_io import write_to_json, write_to_nifti
 from sarcosegv2.data_models import SeriesMetadata, StudyMetadata
 from sarcosegv2.series_filter import (
     CONTRAST_PHASE_DESC_PATTERNS,
@@ -56,7 +56,6 @@ def preprocess_study(
         return
 
     dicom_files, dicom_dir = dicom_files
-    log.debug(f"Preprocessing DICOM study, files at `{dicom_dir}`")
 
     datasets = [dcmread(fp, stop_before_pixels=True) for fp in dicom_files]
 
@@ -71,6 +70,15 @@ def preprocess_study(
     )
     study_metadata.series = select_series_to_segment(series_metadatas)
 
+    output_dir = output_dir.joinpath(
+        f"{study_metadata.participant}_{study_metadata.study_uid}"
+    )
+    output_dir.mkdir(exist_ok=True, parents=True)
+    filepath = output_dir.joinpath(
+        f"dicom_tags_{study_metadata.participant}_{study_metadata.study_uid}.json"
+    )
+
+    write_to_json(study_metadata.to_mapping(), filepath)
     write_to_nifti(study_dir, output_dir, study_metadata.series)
 
 

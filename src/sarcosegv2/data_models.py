@@ -1,11 +1,9 @@
 from collections.abc import Mapping
-from dataclasses import dataclass, field, fields
-from pathlib import Path
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any
 
 from loguru import logger as log
 
-from sarcosegv2._types import StrPath
 
 
 @dataclass(repr=False)
@@ -60,8 +58,8 @@ StudyMetadata(
             log.warning(f"StudyMetadata has no series by {name}")
         return series
 
-    def write_to_json(self, output_dir: StrPath):
-        output_dir = Path(output_dir)
+    def to_mapping(self) -> Mapping[str, Any]:
+        return asdict(self)
 
 
 @dataclass(repr=False)
@@ -121,6 +119,12 @@ SeriesMetadata(
             mean_ctdi_vol=map.get("mean_ctdi_vol"),
             dose_length_product=map.get("dose_length_product"),
         )
+
+    def to_mapping(self) -> Mapping[str, Any]:
+        """
+        Convert `SeriesMetadata` into dictionary map.
+        """
+        return asdict(self)
 
     def add_dose(self, dose: dict[str, float]):
         """

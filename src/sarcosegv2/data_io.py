@@ -1,4 +1,6 @@
+import json
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -16,12 +18,12 @@ def find_study_input(input_dir: StrPath, study_uid: str) -> Path | None:
     Uses the whole `StudyInstanceUID` DICOM tag value as pattern.
 
     Parameters
-    ---------
+    ----------
     input_dir : Path
         Directory path containing input study files.
         Expects NifTI file .../<uid>.nii.gz, .../<uid>.nii or DICOM directory .../<uid>/.
     study_uid : str
-        Identifying pattern to find input study.
+        Identifying StudyInstanceUID pattern to find input study.
 
     Returns
     -------
@@ -135,6 +137,10 @@ def write_to_nifti(
         log.debug(f"Written {series.series_name} into `{output_filepath}`")
 
 
-def write_metadata(self):
-    """ """
-    NotImplementedError
+def write_to_json(mapping: Mapping[str, Any], filepath: StrPath):
+    """
+    Write dictionary-like mapping into `.json`.
+    """
+
+    with open(filepath, mode="w") as file:
+        json.dump(mapping, file, indent=4)
