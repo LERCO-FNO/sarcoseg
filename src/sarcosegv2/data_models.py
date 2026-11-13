@@ -1,7 +1,8 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
 from pathlib import Path
+from typing import Any
 
-import polars as pl
 from loguru import logger as log
 
 from sarcosegv2.types import StrPath
@@ -25,16 +26,26 @@ StudyMetadata(
         """
 
     @classmethod
-    def from_dataframe(cls, df: pl.DataFrame):
+    def from_mapping(cls, map: Mapping[str, Any]) -> StudyMetadata:
         """
-        Construct a list of `StudyMetadata` from `polars.DataFrame`.
-        Requires `polars.DataFrame` to have non-empty `study_uid` and `participant` columns, case insensitive.
+        Construct an instance of `StudyMetadata` from a map, expecting non-empty key-value pairs `study_uid` and `participant`.
 
         Returns
         -------
-        list(StudyMetadata)
+        StudyMetadata
         """
-        return NotImplementedError
+
+        missing = [k for k in ("participant", "study_uid") if not map.get(k)]
+        if missing:
+            raise ValueError(
+                f"Missing or empty required keys {missing} in row {dict(map)}"
+            )
+
+        return cls(
+            participant=map["participant"],
+            study_uid=map["study_uid"],
+            patient_height=map.get("patient_height"),
+        )
 
     def series_by_name(self, name: str):
         """
