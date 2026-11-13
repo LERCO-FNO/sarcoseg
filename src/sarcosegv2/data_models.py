@@ -5,7 +5,7 @@ from typing import Any
 
 from loguru import logger as log
 
-from sarcosegv2.types import StrPath
+from sarcosegv2._types import StrPath
 
 
 @dataclass(repr=False)

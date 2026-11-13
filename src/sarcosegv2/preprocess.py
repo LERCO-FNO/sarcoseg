@@ -8,13 +8,13 @@ from loguru import logger as log
 from pydicom import Dataset, dcmread
 from pydicom.multival import MultiValue
 
+from sarcosegv2._types import StrPath
 from sarcosegv2.data_io import write_to_nifti
 from sarcosegv2.data_models import SeriesMetadata, StudyMetadata
 from sarcosegv2.series_filter import (
     CONTRAST_PHASE_DESC_PATTERNS,
     filter_cfind_series_responses,
 )
-from sarcosegv2.types import StrPath
 from sarcosegv2.utils import find_dicoms
 
 

@@ -9,9 +9,9 @@ from pynetdicom.association import Association
 # pyrefly: ignore[missing-module-attribute]
 from pynetdicom.sop_class import StudyRootQueryRetrieveInformationModelMove
 
+from sarcosegv2._types import StrPath
 from sarcosegv2.data_io import read_toml
 from sarcosegv2.series_filter import filter_cfind_series_responses
-from sarcosegv2.types import StrPath
 
 DEFAULT_CONFIG_FILE = Path("./default_config.toml").absolute()
 REQUIRED_PACS_PORT_CONFIG_KEYS = ("port", "store_port")
