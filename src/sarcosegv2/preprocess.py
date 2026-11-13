@@ -19,7 +19,6 @@ from sarcosegv2.utils import find_dicoms
 
 
 def preprocess_study(
-    self,
     study_dir: StrPath,
     output_dir: StrPath,
     study_metadata: StudyMetadata,
@@ -43,7 +42,7 @@ def preprocess_study(
 
     if study_metadata:
         log.info(
-            f"Preprocessing DICOM study case {study_metadata.participant} (uid: {study_metadata.uid}) at `{study_dir}`"
+            f"Preprocessing DICOM study case {study_metadata.participant} (uid: {study_metadata.study_uid}) at `{study_dir}`"
         )
     else:
         log.info(f"Preprocessing unknown DICOM study case at `{study_dir}`")
@@ -97,7 +96,7 @@ CONTRAST_PHASES_PATTERN = re.compile(
 
 def extract_series_metadata(
     datasets_by_series_uid: Mapping[str, list[Dataset]],
-    dose_by_irrad_uid: dict[str, dict[str, float]] | None,
+    dose_by_irrad_uid: dict[str, dict[str, float]] | None = None,
 ) -> list[SeriesMetadata]:
     """
     Select the highest-resolution series (thinnest slices and highest slice count) per contrast phase.

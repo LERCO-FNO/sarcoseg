@@ -10,7 +10,7 @@ from sarcosegv2.types import StrPath
 @dataclass(repr=False)
 class StudyMetadata:
     participant: str
-    uid: str
+    study_uid: str
     patient_height: float | int | None = field(default=None, compare=False)
     series: dict[str, SeriesMetadata] = field(default_factory=dict, compare=False)
 
