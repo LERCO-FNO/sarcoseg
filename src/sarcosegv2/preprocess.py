@@ -65,9 +65,7 @@ def preprocess_study(
     if not dose_by_irrad_uid:
         log.warning(f"No dose data found for study at `{study_dir}`")
 
-    series_metadatas, currents_by_series = extract_series_metadata(
-        datasets_by_uid, dose_by_irrad_uid
-    )
+    series_metadatas = extract_series_metadata(datasets_by_uid, dose_by_irrad_uid)
     study_metadata.series = select_series_to_segment(series_metadatas)
 
     output_dir = output_dir.joinpath(
@@ -78,6 +76,7 @@ def preprocess_study(
         f"dicom_tags_{study_metadata.participant}_{study_metadata.study_uid}.json"
     )
 
+    # write_to_json(currents_by_series, output_dir.joinpath("currents_by_series.json"))
     write_to_json(study_metadata.to_mapping(), filepath)
     write_to_nifti(study_dir, output_dir, study_metadata.series)
 
@@ -110,7 +109,7 @@ CONTRAST_PHASES_PATTERN = re.compile(
 def extract_series_metadata(
     datasets_by_series_uid: Mapping[str, list[Dataset]],
     dose_by_irrad_uid: DoseByIrradUID | None = None,
-) -> tuple[list[SeriesMetadata], CurrentBySeries]:
+) -> list[SeriesMetadata]:
     """
     Select the highest-resolution series (thinnest slices and highest slice count) per contrast phase.
 
@@ -125,7 +124,6 @@ def extract_series_metadata(
         List of candidate `SeriesMetadata` instances.
     """
     series_metadatas = []
-    currents_by_series: CurrentBySeries = defaultdict(dict[str, float])
     for series_uid, datasets in datasets_by_series_uid.items():
         ds = datasets[0]
 
@@ -145,7 +143,7 @@ def extract_series_metadata(
         slice_thickness = float(ds.get("SliceThickness", -1.0))
         series_name = f"{contrast_phase}_{slice_thickness}_{convolution_kernel}"
 
-        mean_currents, currents_by_instance = extract_tube_currents(datasets)
+        currents_by_instance, mean_current = extract_tube_currents(datasets)
 
         series_meta = SeriesMetadata(
             series_uid=series_uid,
@@ -158,10 +156,9 @@ def extract_series_metadata(
             slice_count=len(datasets),
             irradiation_event_uid=ds.get("IrradiationEventUID"),
             kilo_voltage_peak=float(ds.get("KVP", -1.0)),
-            mean_tube_current=mean_currents,
+            currents_by_instance=currents_by_instance,
+            mean_tube_current=mean_current,
         )
-
-        currents_by_series[series_meta.series_name] = currents_by_instance
 
         if dose_by_irrad_uid and series_meta.irradiation_event_uid:
             if dose := dose_by_irrad_uid.get(series_meta.irradiation_event_uid, None):
@@ -174,7 +171,7 @@ def extract_series_metadata(
         log.debug(f"Constructed {series_meta:v}")
         series_metadatas.append(series_meta)
 
-    return series_metadatas, currents_by_series
+    return series_metadatas
 
 
 def select_series_to_segment(
@@ -315,17 +312,17 @@ def extract_ct_dose(
 
 def extract_tube_currents(
     datasets: list[Dataset],
-) -> tuple[float, dict[str, float]]:
+) -> tuple[dict[str, float], float]:
     """
     Collect XRayTubeCurrent values from series unique datasets sorted by InstanceNumber.
     If collection isn't empty return sorted collection and mean tube current, otherwise (`nan`, {}).
 
     Returns
     -------
-    float
-        Mean tube current.
     dict(str, float)
         Tube current values keyed and sorted by InstanceNumber.
+    float
+        Mean tube current.
     """
     raw = {
         ds.get("InstanceNumber"): ds.get("XRayTubeCurrent")
@@ -336,7 +333,7 @@ def extract_tube_currents(
         log.warning(
             f"XRayTubeCurrent tag missing or has empty value in all {len(datasets)} datasets"
         )
-        return float("nan"), {}
+        return {}, float("nan")
 
     tube_currents = {k: float(v) for k, v in raw.items() if v not in (None, "")}
 
@@ -347,4 +344,4 @@ def extract_tube_currents(
             f"Returning mean of {clean_len}/{raw_len} values, {raw_len - clean_len} datasets have missing/empty XRayTubeCurrent attribute"
         )
 
-    return mean(tube_currents.values()), dict(sorted(tube_currents.items()))
+    return dict(sorted(tube_currents.items())), mean(tube_currents.values())

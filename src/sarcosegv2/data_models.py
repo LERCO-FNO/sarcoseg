@@ -73,6 +73,7 @@ class SeriesMetadata:
     slice_count: int | None = None
     irradiation_event_uid: str | None = None
     kilo_voltage_peak: float | None = None
+    currents_by_instance: dict[str, float] | None = None
     mean_tube_current: float | None = None
     mean_ctdi_vol: float | None = None
     dose_length_product: float | None = None
@@ -118,6 +119,7 @@ SeriesMetadata(
             slice_count=map.get("slice_count"),
             irradiation_event_uid=map.get("irradiation_event_uid"),
             kilo_voltage_peak=map.get("kilo_voltage_peak"),
+            currents_by_instance=map.get("currents_by_instance"),
             mean_tube_current=map.get("mean_tube_current"),
             mean_ctdi_vol=map.get("mean_ctdi_vol"),
             dose_length_product=map.get("dose_length_product"),
