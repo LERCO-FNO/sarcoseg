@@ -131,6 +131,8 @@ def extract_series_metadata(
         slice_thickness = float(ds.get("SliceThickness", -1.0))
         series_name = f"{contrast_phase}_{slice_thickness}_{convolution_kernel}"
 
+        mean_currents, currents_by_instance = extract_tube_currents(datasets)
+
         series_meta = SeriesMetadata(
             series_uid=series_uid,
             series_name=series_name,
@@ -142,7 +144,7 @@ def extract_series_metadata(
             slice_count=len(datasets),
             irradiation_event_uid=ds.get("IrradiationEventUID"),
             kilo_voltage_peak=float(ds.get("KVP", -1.0)),
-            mean_tube_current=extract_mean_tube_current(datasets),
+            mean_tube_current=mean_currents,
         )
 
         if dose_by_irrad_uid and series_meta.irradiation_event_uid:
@@ -295,15 +297,38 @@ def extract_ct_dose(
     return dose_by_irrad_uid
 
 
-def extract_mean_tube_current(datasets: list[Dataset]) -> float:
+def extract_tube_currents(
+    datasets: list[Dataset],
+) -> tuple[float, dict[str, float]]:
     """
-    Collect XRayTubeCurrent values and return their mean.
+    Collect XRayTubeCurrent values from series unique datasets sorted by InstanceNumber.
+    If collection isn't empty return sorted collection and mean tube current, otherwise (`nan`, {}).
+
+    Returns
+    -------
+    float
+        Mean tube current.
+    dict(str, float)
+        Tube current values keyed and sorted by InstanceNumber.
     """
-    raw_tube_currents = [ds.get("XRayTubeCurrent") for ds in datasets]
-    tube_currents = [float(c) for c in raw_tube_currents if c]
-    if len(tube_currents) < len(raw_tube_currents):
+    raw = {
+        ds.get("InstanceNumber"): ds.get("XRayTubeCurrent")
+        for idx, ds in enumerate(datasets)
+    }
+
+    if all([v in (None, "") for v in raw.values()]):
         log.warning(
-            f"Some DICOM datasets don't have XRayTubeCurrent: expected {len(raw_tube_currents)} values, got {len(tube_currents)}"
+            f"XRayTubeCurrent tag missing or has empty value in all {len(datasets)} datasets"
+        )
+        return float("nan"), {}
+
+    tube_currents = {k: float(v) for k, v in raw.items() if v not in (None, "")}
+
+    raw_len = len(raw)
+    clean_len = len(tube_currents)
+    if clean_len != raw_len:
+        log.warning(
+            f"Returning mean of {clean_len}/{raw_len} values, {raw_len - clean_len} datasets have missing/empty XRayTubeCurrent attribute"
         )
 
-    return mean(tube_currents)
+    return mean(tube_currents.values()), dict(sorted(tube_currents.items()))
