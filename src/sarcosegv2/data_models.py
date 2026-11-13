@@ -5,7 +5,6 @@ from typing import Any
 from loguru import logger as log
 
 
-
 @dataclass(repr=False)
 class StudyMetadata:
     participant: str
@@ -45,17 +44,17 @@ StudyMetadata(
             patient_height=map.get("patient_height"),
         )
 
-    def series_by_name(self, name: str):
+    def series_by_name(self, series_name: str):
         """
-        Convenience method to access series by `name` key.
+        Convenience method to access series by `series_name` key.
 
         Returns
         -------
         SeriesMetadata or None
         """
-        series = self.series.get(name)
+        series = self.series.get(series_name)
         if not series:
-            log.warning(f"StudyMetadata has no series by {name}")
+            log.warning(f"StudyMetadata has no series by {series_name}")
         return series
 
     def to_mapping(self) -> Mapping[str, Any]:
@@ -98,7 +97,11 @@ SeriesMetadata(
 
     @classmethod
     def from_mapping(cls, map: Mapping[str, Any]):
-        missing = [k for k in ("uid", "name") if not map.get(k)]
+        """
+        Instantiate `StudyMetadata` from dictionary-like map.
+        Requires non-empty `series_uid`, `series_name` key-value pairs.
+        """
+        missing = [k for k in ("series_uid", "series_name") if not map.get(k)]
         if missing:
             raise ValueError(
                 f"Missing or empty required keys {missing} in row {dict(map)}"
@@ -126,7 +129,7 @@ SeriesMetadata(
         """
         return asdict(self)
 
-    def add_dose(self, dose: dict[str, float]):
+    def add_dose(self, dose: Mapping[str, float]):
         """
         Adds dose values meanCTDIvol and Dose Length Product (DLP) to SeriesMetadata.
         Value -1.0 indicates a missing value in Dose Report Structure Report DICOM file.
