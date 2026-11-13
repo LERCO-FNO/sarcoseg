@@ -98,6 +98,30 @@ SeriesMetadata(
             return f"{type(self).__name__}({parts})"
         return repr(self)
 
+    @classmethod
+    def from_mapping(cls, map: Mapping[str, Any]):
+        missing = [k for k in ("uid", "name") if not map.get(k)]
+        if missing:
+            raise ValueError(
+                f"Missing or empty required keys {missing} in row {dict(map)}"
+            )
+
+        return cls(
+            uid=map["uid"],
+            name=map["name"],
+            description=map.get("description"),
+            contrast_phase=map.get("contrast_phase"),
+            series_contrast_type=map.get("series_contrast_type"),
+            convolution_kernel=map.get("convolution_kernel"),
+            slice_thickness=map.get("slice_thickness"),
+            slice_count=map.get("slice_count"),
+            irradiation_event_uid=map.get("irradiation_event_uid"),
+            kilo_voltage_peak=map.get("kilo_voltage_peak"),
+            mean_tube_current=map.get("mean_tube_current"),
+            mean_ctdi_vol=map.get("mean_ctdi_vol"),
+            dose_length_product=map.get("dose_length_product"),
+        )
+
     def add_dose(self, dose: dict[str, float]):
         """
         Adds dose values meanCTDIvol and Dose Length Product (DLP) to SeriesMetadata.
