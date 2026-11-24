@@ -117,9 +117,7 @@ def write_to_nifti(
 
     for series in series_metadatas.values():
         log.debug(f"Writing {series.series_name} volume as NIfTI")
-        output_filepath = output_dir.joinpath(
-            series.series_name, "input_ct_volume.nii.gz"
-        )
+        output_filepath = output_dir.joinpath(series.series_name, "input_volume.nii.gz")
         output_filepath.parent.mkdir(exist_ok=True, parents=True)
 
         if output_filepath.exists():
@@ -135,6 +133,16 @@ def write_to_nifti(
             continue
 
         log.debug(f"Written {series.series_name} into `{output_filepath}`")
+
+
+def read_from_json(filepath: StrPath) -> Mapping[str, Any]:
+    """
+    Read `.json` into dictionary-like mapping.
+    """
+
+    with open(filepath, mode="r") as file:
+        data = json.load(file)
+    return data
 
 
 def write_to_json(mapping: Mapping[str, Any], filepath: StrPath):

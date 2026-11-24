@@ -39,7 +39,7 @@ def get_args():
         "--remove-input-ct-volume",
         action="store_true",
         default=False,
-        help="Remove stored `input_ct_volume.nii.gz` files from <output-dir>",
+        help="Remove stored `input_volume.nii.gz` files from <output-dir>",
     )
     parser.add_argument(
         "-z",

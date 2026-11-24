@@ -1,14 +1,24 @@
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, fields
-from typing import Any
+from enum import StrEnum
+from typing import Any, NamedTuple
 
 from loguru import logger as log
+
+
+class Result(StrEnum):
+    Ok = "OK"
+    ImageWrite = "IMAGE_WRITE"
+    SeriesMetadataNotFound = "SERIES_METADATA_NOT_FOUND"
+    VertebraeLabelNotFound = "VERTEBRAE_LABEL_NOT_FOUND"
+    SpineSegmentationFail = "SPINE_SEGMENTATION_FAIL"
+    TissueSegmentationFail = "TISSUE_SEGMENTATION_FAIL"
 
 
 @dataclass(repr=False)
 class StudyMetadata:
     participant: str
-    study_uid: str
+    study_uid: str | None = field(default=None)
     patient_height: float | int | None = field(default=None, compare=False)
     series: dict[str, SeriesMetadata] = field(default_factory=dict, compare=False)
 
@@ -40,11 +50,12 @@ StudyMetadata(
 
         return cls(
             participant=map["participant"],
-            study_uid=map["study_uid"],
+            study_uid=map.get("study_uid"),
             patient_height=map.get("patient_height"),
+            series=map.get("series"),
         )
 
-    def series_by_name(self, series_name: str):
+    def series_by_name(self, series_name: str) -> SeriesMetadata | None:
         """
         Convenience method to access series by `series_name` key.
 
@@ -138,3 +149,114 @@ SeriesMetadata(
         """
         self.mean_ctdi_vol = dose.get("mean_ctdi_vol", -1.0)
         self.dose_length_product = dose.get("dose_length_product", -1.0)
+
+
+class Centroid(NamedTuple):
+    """
+    Centroid coordinates (voxel space) of vertebrae body.
+    Assumes LPS orientation of `sitk.Image`.
+    """
+
+    x: int  # Right towards Left
+    y: int  # Anterior towards Posterior
+    z: int  # Inferior towards Superior
+
+
+@dataclass
+class SegmentationTime:
+    """
+    Elapsed time (seconds) of each step.
+    """
+
+    spine_s: float | None = None
+    tissue_s: float | None = None
+    postprocess_s: float | None = None
+
+
+class TissueType(StrEnum):
+    # FIX: Improve the docstring.
+    """
+    For serialization.
+    """
+
+    SAT = "sat"
+    VAT = "vat"
+    IMAT = "imat"
+    MUSCLE = "muscle"
+
+
+@dataclass(frozen=True)
+class TissueArea:
+    """
+    Cross-section area (mm^2) per tissue type:
+
+    sat - subcutaneous adipose tissue
+    vat - visceral adipose tissue
+    imat - intermuscular adipose tissue
+    muscle - muscle tissue
+    """
+
+    sat: float
+    vat: float
+    imat: float
+    muscle: float
+
+
+@dataclass(frozen=True)
+class TissueMeanHU:
+    """
+    Mean Hounsfield Unit per tissue type:
+
+    sat - subcutaneous adipose tissue
+    vat - visceral adipose tissue
+    imat - intermuscular adipose tissue
+    muscle - muscle tissue
+    """
+
+    sat: float
+    vat: float
+    imat: float
+    muscle: float
+
+
+@dataclass
+class TissueMetrics:
+    area_cm2: TissueArea
+    mean_hu: TissueMeanHU
+
+
+@dataclass(repr=False)
+class SeriesResult:
+    """
+    Segmentation result for each series within a study case.
+    Identified by `series_name` and `series_uid`.
+
+    Stores vertebrae centroid, tissue metrics (area cm^2, mean HU)
+    and duration (seconds) of each processing step - spine segmentation, tissue segmentation, postprocessing.
+    """
+
+    series_name: str
+    series_uid: str | None = field(default=None)
+    status: Result | None = field(default=None)
+    vertebrae_centroid: Centroid | None = field(default=None)
+    metrics: TissueMetrics | None = field(default=None)
+    durations: SegmentationTime = field(default_factory=SegmentationTime)
+    volume_z_size: int | None = field(default=None)
+    l3_slice_index: int | None = field(default=None)
+    l3_tube_current: float | None = field(default=None)
+
+
+@dataclass(repr=False)
+class StudySegmentationResult:
+    participant: str
+    study_uid: str | None = field(default=None)
+    patient_height: float | None = field(default=None, compare=False)
+    series: dict[str, SeriesResult] = field(default_factory=dict, compare=False)
+
+    @classmethod
+    def from_study_metadata(cls, study_case: StudyMetadata) -> StudySegmentationResult:
+        return cls(
+            study_case.participant,
+            study_case.study_uid,
+            patient_height=study_case.patient_height,
+        )
