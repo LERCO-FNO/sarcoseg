@@ -260,9 +260,13 @@ def find_vertebrae_body_centroid(
 
 
 def postprocess_tissue_mask(tissue_slice: StrPath, tissue_mask: StrPath):
-    # FIXME: improve docstring.
     """
-    Postprocess IMAT and VAT masks.
+    Relabel IMAT and VAT masks within specific HU range:
+    `muscle` mask labels with HU values within (-190, -30) (both inclusive) replaced with `imat` mask label.
+    `vat` mask labels with HU values greater than -51 (exclusive) replaced with 0.
+
+    Both relabeling preceeded with morphological BinaryOpeningByReconstruction step to remove small objects/blobs.
+    Uses structuring element sitkBall of size 1.
     """
 
     tissue_mask = Path(tissue_mask)
@@ -273,6 +277,8 @@ def postprocess_tissue_mask(tissue_slice: StrPath, tissue_mask: StrPath):
     mask_image = sitk.ReadImage(tissue_mask)
     tissue_image = sitk.ReadImage(tissue_slice)
 
+    # During testing identified mismatch between mask-tissue span in physical space.
+    # Resample to make sure both images occupy same physical space.
     if mask_image.GetOrigin() != tissue_image.GetOrigin():
         log.warning(
             "Mask and tissue images do not occupy same physical space, resampling mask..."
