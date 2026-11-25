@@ -49,7 +49,7 @@ def timed_step(durations: SegmentationTime, step_name: str):
 
 def segment_ct(
     input_dir: StrPath, output_dir: StrPath, study_case: StudyMetadata | None = None
-) -> tuple[Result, list]:
+) -> tuple[StudySegmentationResult, list]:
 
     input_dir = Path(input_dir)
     output_dir = Path(output_dir)
@@ -78,7 +78,9 @@ def segment_ct(
             log.error(
                 f"No matching series metadata for nifti file `{series_output_dir}` found, skipping"
             )
-            failed.append((input_dir, series_output_dir, Result.SeriesMetadataNotFound))
+            failed.append(
+                (input_dir, series_output_dir.name, Result.SeriesMetadataNotFound)
+            )
             continue
 
         series_name = series_metadata.series_name
@@ -96,14 +98,16 @@ def segment_ct(
                 f"Failed spine segmentation for {series_metadata.series_name}"
             )
             series_result.status = Result.SpineSegmentationFail
-            failed.append((input_dir, series_output_dir, series_result.status))
+            failed.append((input_dir, series_name, series_result.status))
             continue
 
         # ------ EXTRACT SLICES ------
         output_tissue_slice = series_output_dir.joinpath("tissue_slice.nii.gz")
-        result = extract_slices(nifti_file, output_spine_mask, output_tissue_slice)
-        if result in (Result.ImageWrite, Result.VertebraeLabelNotFound):
-            failed.append((input_dir, series_output_dir, result))
+        centroid_result = extract_slices(
+            nifti_file, output_spine_mask, output_tissue_slice
+        )
+        if centroid_result in (Result.ImageWrite, Result.VertebraeLabelNotFound):
+            failed.append((input_dir, series_name, centroid_result))
             continue
 
         # ------ TISSUE SEGMENTATION ------
@@ -118,7 +122,7 @@ def segment_ct(
                 f"Failed tissue segmentation for {series_metadata.series_name}"
             )
             series_result.status = Result.TissueSegmentationFail
-            failed.append((input_dir, series_output_dir, series_result.status))
+            failed.append((input_dir, series_name, series_result.status))
             continue
 
         # ------ TISSUE POSTPROCESS ------
@@ -134,10 +138,10 @@ def segment_ct(
 
     log.info(f"Case {study_case.participant} (study_uid {study_case.study_uid}):")
     log.info(
-        f"Total NifTI files: {len(nifti_files)}, finished: {len(nifti_files) - len(failed)}, failed: {len(failed)}"
+        f"Total NifTI files {len(nifti_files)}, completed {len(nifti_files) - len(failed)}, failed {len(failed)}"
     )
 
-    return Result.Ok, failed
+    return study_result, failed
 
 
 def segment_spine(
