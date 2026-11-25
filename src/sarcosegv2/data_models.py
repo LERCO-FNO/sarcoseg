@@ -1,9 +1,15 @@
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, fields
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, NamedTuple
 
+import SimpleITK as sitk
 from loguru import logger as log
+
+from sarcosegv2._types import StrPath
+from sarcosegv2.data_io import read_from_json
+from sarcosegv2.labels import TISSUE_LABEL_BY_NAME
 
 
 class Result(StrEnum):
@@ -173,18 +179,6 @@ class SegmentationTime:
     postprocess_s: float | None = None
 
 
-class TissueType(StrEnum):
-    # FIX: Improve the docstring.
-    """
-    For serialization.
-    """
-
-    SAT = "sat"
-    VAT = "vat"
-    IMAT = "imat"
-    MUSCLE = "muscle"
-
-
 @dataclass(frozen=True)
 class TissueArea:
     """
@@ -221,8 +215,59 @@ class TissueMeanHU:
 
 @dataclass
 class TissueMetrics:
-    area_cm2: TissueArea
-    mean_hu: TissueMeanHU
+    area_cm2: dict[str, float] = field(default_factory=dict)
+    mean_hu: dict[str, float] = field(default_factory=dict)
+    skeletal_muscle_index: float | None = field(default=None)
+
+    @classmethod
+    def compute_metrics(
+        cls,
+        tissue_vol: sitk.Image,
+        mask: sitk.Image,
+        patient_height_cm: float | None = None,
+    ) -> TissueMetrics:
+        """
+        Compute tissue metrics per tissue type - area (cm^2), mean HU - and skeletal muscle index (cm^2 / m^2).
+        Expects patient height in centimeters.
+        """
+
+        if tissue_vol.GetSize()[-1] == 1 and mask.GetSize()[-1] == 1:
+            tissue_vol = tissue_vol[..., 0]
+            mask == mask[..., 0]
+
+        stats_filt = sitk.LabelIntensityStatisticsImageFilter()
+        stats_filt.Execute(tissue_vol, mask)
+
+        area = {
+            tissue_type: round(stats_filt.GetPhysicalSize(label) / 100.0, ndigits=4)
+            for tissue_type, label in TISSUE_LABEL_BY_NAME.items()
+        }
+
+        mean_hu = {
+            tissue_type: round(stats_filt.GetMean(label), ndigits=4)
+            for tissue_type, label in TISSUE_LABEL_BY_NAME.items()
+        }
+
+        skeletal_muscle_index = None
+        if patient_height_cm and patient_height_cm > 0:
+            skeletal_muscle_index = compute_smi(
+                area["muscle"],
+                patient_height_cm,
+            )
+
+        return TissueMetrics(
+            area_cm2=area, mean_hu=mean_hu, skeletal_muscle_index=skeletal_muscle_index
+        )
+
+
+def compute_smi(muscle_area_cm2: float, patient_height_cm: float) -> float:
+    """
+    Return skeletal muscle index (SMI), defined as `SMI = muscle_area / (patient_height ^ 2)`, rounded to 4 digits.
+    Expects muscle area in centimeters^2, patient height in centimeters.
+
+    Patient height is implicitly converted to meters.
+    """
+    return round(muscle_area_cm2 / ((patient_height_cm / 100.0) ** 2), ndigits=4)
 
 
 @dataclass(repr=False)
@@ -239,11 +284,35 @@ class SeriesResult:
     series_uid: str | None = field(default=None)
     status: Result | None = field(default=None)
     vertebrae_centroid: Centroid | None = field(default=None)
-    metrics: TissueMetrics | None = field(default=None)
+    tissue_metrics: TissueMetrics = field(default_factory=TissueMetrics)
     durations: SegmentationTime = field(default_factory=SegmentationTime)
     volume_z_size: int | None = field(default=None)
-    l3_slice_index: int | None = field(default=None)
     l3_tube_current: float | None = field(default=None)
+
+    def compute_metrics(self, tissue_vol: sitk.Image, mask: sitk.Image) -> None:
+        """
+        Convenience method for computing tissue metrics. See `TissueMetrics.compute_metrics()` for more details.
+        """
+        self.tissue_metrics = TissueMetrics.compute_metrics(tissue_vol, mask)
+
+    def set_ct_z_size(self, ct_volume: StrPath | sitk.Image):
+        if type(ct_volume) is StrPath:
+            ct_volume = sitk.ReadImage(ct_volume)
+        self.ct_z_size = ct_volume.GetDepth()
+
+    def set_l3_tube_current(self, series_dir: StrPath, instance_index: int):
+        currents_by_inst = read_from_json(
+            Path(series_dir).joinpath(
+                f"dicom_tags_{self.series_name}_{self.series_uid}.json"
+            )
+        )["series"].get(self.series_name)["currents_by_instance"]
+
+        if currents_by_inst is None:
+            log.warning(
+                f"Series {self.series_name} (uid {self.series_uid}) has no tube currents in dicom_tags json"
+            )
+
+        self.l3_tube_current = currents_by_inst.get(str(instance_index))
 
 
 @dataclass(repr=False)

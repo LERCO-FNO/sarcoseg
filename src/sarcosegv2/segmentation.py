@@ -18,6 +18,7 @@ from sarcosegv2.data_models import (
     SeriesResult,
     StudyMetadata,
     StudySegmentationResult,
+    TissueMetrics,
 )
 from sarcosegv2.labels import TISSUE_HU_RANGES, TISSUE_LABEL_BY_NAME, VERTEBRAE_LABELS
 
@@ -130,6 +131,19 @@ def segment_ct(
             output_tissue_slice,
             output_tissue_mask,
         )
+
+        # ------ METRICS COMPUTATION ------
+        tissue_vol = sitk.ReadImage(output_tissue_slice)
+        mask_pp = sitk.ReadImage(
+            output_tissue_mask.parent.joinpath("tissue_mask_pp.nii.gz")
+        )
+        series_result.tissue_metrics = TissueMetrics.compute_metrics(
+            tissue_vol, mask_pp, study_result.patient_height
+        )
+
+        # ------ OTHER SERIES RESULT STUFF ------
+        series_result.set_ct_z_size(nifti_file)
+        series_result.set_l3_tube_current(series_output_dir, centroid_result.z)
 
         series_result.status = Result.Ok
 
