@@ -141,7 +141,7 @@ def extract_series_metadata(
         contrast_type, contrast_phase = resolve_contrast_phase(ds)
 
         slice_thickness = float(ds.get("SliceThickness", -1.0))
-        series_name = f"{contrast_phase}_{slice_thickness}_{convolution_kernel}"
+        series_name = f"{contrast_phase}_{slice_thickness}_{convolution_kernel}".lower()
 
         currents_by_instance, mean_current = extract_tube_currents(datasets)
 
