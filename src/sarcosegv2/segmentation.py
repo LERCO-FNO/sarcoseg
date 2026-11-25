@@ -129,8 +129,11 @@ def segment_ct(
 
         series_result.status = Result.Ok
 
-    log.debug(f"Case {study_case.participant} (study_uid {study_case.study_uid}):")
-    log.debug(
+        study_result.series[series_name] = series_result
+        log.debug(f"Finished series segmentation `{series_name}`")
+
+    log.info(f"Case {study_case.participant} (study_uid {study_case.study_uid}):")
+    log.info(
         f"Total NifTI files: {len(nifti_files)}, finished: {len(nifti_files) - len(failed)}, failed: {len(failed)}"
     )
 
@@ -215,7 +218,6 @@ def extract_slices(
     else:
         output_tissue_slice = Path.cwd().joinpath("tissue_slice.nii.gz")
 
-    # FIXME: replace with non-hardcoded label
     centroid = find_vertebrae_body_centroid(
         spine_mask, VERTEBRAE_LABELS["vertebrae_L3"]
     )
