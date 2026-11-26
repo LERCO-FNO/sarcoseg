@@ -8,7 +8,7 @@ from loguru import logger as log
 from pydicom import Dataset, dcmread
 from pydicom.multival import MultiValue
 
-from sarcosegv2._types import StrPath
+from sarcosegv2._types import SeriesIdentity, StrPath
 from sarcosegv2.data_io import write_to_json, write_to_nifti
 from sarcosegv2.data_models import SeriesMetadata, StudyMetadata
 from sarcosegv2.series_filter import (
@@ -77,8 +77,12 @@ def preprocess_study(
     )
 
     # write_to_json(currents_by_series, output_dir.joinpath("currents_by_series.json"))
+    series_to_nifti: list[SeriesIdentity] = [
+        SeriesIdentity(series.series_name, series.series_uid)
+        for series in study_metadata.series.values()
+    ]
     write_to_json(study_metadata.to_mapping(), filepath)
-    write_to_nifti(study_dir, output_dir, study_metadata.series)
+    write_to_nifti(study_dir, output_dir, series_to_nifti)
 
 
 # Restructure map for the purpose of guessing contrast phase by pattern matching.

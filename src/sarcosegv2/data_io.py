@@ -8,8 +8,9 @@ import polars as pl
 from loguru import logger as log
 from SimpleITK import ImageSeriesReader, WriteImage
 
-from sarcosegv2._types import StrPath
-from sarcosegv2.data_models import SeriesMetadata
+from sarcosegv2._types import SeriesIdentity, StrPath
+
+# from sarcosegv2.data_models import SeriesMetadata
 
 
 def find_study_input(input_dir: StrPath, study_uid: str) -> Path | None:
@@ -104,10 +105,10 @@ def read_toml(path: Path | str) -> dict[str, Any]:
 def write_to_nifti(
     study_dir: StrPath,
     output_dir: StrPath,
-    series_metadatas: dict[str, SeriesMetadata],
+    series_list: list[SeriesIdentity],
 ):
     """
-    Writes DICOM series to NIfTI format.
+    Converts DICOM series to NIfTI format, based on selected series tied to series_uid in `SeriesIdentity`.
     """
 
     study_dir = Path(study_dir)
@@ -115,15 +116,15 @@ def write_to_nifti(
 
     reader = ImageSeriesReader()
 
-    for series in series_metadatas.values():
-        log.debug(f"Writing {series.series_name} volume as NIfTI")
-        output_filepath = output_dir.joinpath(series.series_name, "input_volume.nii.gz")
+    for series in series_list:
+        log.debug(f"Writing {series.name} volume as NIfTI")
+        output_filepath = output_dir.joinpath(series.name, "input_volume.nii.gz")
         output_filepath.parent.mkdir(exist_ok=True, parents=True)
 
         if output_filepath.exists():
             log.debug(f"Overwritting `{output_filepath}`")
 
-        filenames = reader.GetGDCMSeriesFileNames(study_dir, series.series_uid)
+        filenames = reader.GetGDCMSeriesFileNames(study_dir, series.uid)
         reader.SetFileNames(filenames)
         image = reader.Execute()
         try:
@@ -132,7 +133,7 @@ def write_to_nifti(
             log.error(f"{ex}")
             continue
 
-        log.debug(f"Written {series.series_name} into `{output_filepath}`")
+        log.debug(f"Written {series.name} into `{output_filepath}`")
 
 
 def read_from_json(filepath: StrPath) -> Mapping[str, Any]:
