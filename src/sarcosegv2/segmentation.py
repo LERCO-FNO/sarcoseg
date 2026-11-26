@@ -10,6 +10,7 @@ from loguru import logger as log
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 from totalsegmentator.python_api import totalsegmentator
 
+from sarcosegv2 import visualization
 from sarcosegv2._types import StrPath
 from sarcosegv2.data_io import read_from_json
 from sarcosegv2.data_models import (
@@ -130,6 +131,20 @@ def segment_study(
         # ------ OTHER SERIES RESULT STUFF ------
         series_result.set_ct_z_size(nifti_file)
         series_result.set_l3_tube_current(series_output_dir, centroid_result.z)
+
+        # ------ MASK OVERLAY ------
+        # NOTE: check this works as intended!!
+        #
+        log.debug("Creating mask overlays...")
+        visualization.overlay_spine_mask(
+            seg_images.ct_volume,
+            seg_images.spine_mask,
+            series_result.vertebrae_centroid,
+            series_output_dir,
+        )
+        visualization.overlay_tissue_mask(
+            seg_images.tissue_volume, seg_images.tissue_mask, series_output_dir
+        )
 
         series_result.status = Result.Ok
 
