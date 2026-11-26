@@ -150,5 +150,5 @@ def write_to_json(mapping: Mapping[str, Any], filepath: StrPath):
     Write dictionary-like mapping into `.json`.
     """
 
-    with open(filepath, mode="w") as file:
-        json.dump(mapping, file, indent=4)
+    with open(filepath, mode="w", encoding="utf-8") as file:
+        json.dump(mapping, file, indent=2)
