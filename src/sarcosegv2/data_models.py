@@ -82,6 +82,7 @@ StudyMetadata(
 class SeriesMetadata:
     series_uid: str
     series_name: str
+    series_number: str
     description: str | None = None
     contrast_phase: str | None = None
     contrast_type: str | None = None
@@ -128,6 +129,7 @@ SeriesMetadata(
         return cls(
             series_uid=map["uid"],
             series_name=map["name"],
+            series_number=map["series_number"],
             description=map.get("description"),
             contrast_phase=map.get("contrast_phase"),
             contrast_type=map.get("contrast_type"),

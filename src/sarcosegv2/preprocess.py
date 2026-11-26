@@ -128,6 +128,7 @@ def extract_series_metadata(
         ds = datasets[0]
 
         series_desc = ds.get("SeriesDescription")
+        series_number = f"{ds.get('SeriesNumber'):04}"
         convolution_kernel = ds.get("ConvolutionKernel", None)
         if isinstance(convolution_kernel, MultiValue):
             convolution_kernel = convolution_kernel[0]
@@ -141,13 +142,14 @@ def extract_series_metadata(
         contrast_type, contrast_phase = resolve_contrast_phase(ds)
 
         slice_thickness = float(ds.get("SliceThickness", -1.0))
-        series_name = f"{contrast_phase}_{slice_thickness}_{convolution_kernel}".lower()
+        series_name = f"{series_number}_{contrast_phase}_{slice_thickness}_{convolution_kernel}".lower()
 
         currents_by_instance, mean_current = extract_tube_currents(datasets)
 
         series_meta = SeriesMetadata(
             series_uid=series_uid,
             series_name=series_name,
+            series_number=series_number,
             description=series_desc,
             contrast_phase=contrast_phase,
             contrast_type=contrast_type,
