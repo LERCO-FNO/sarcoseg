@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, fields
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any
 
 import SimpleITK as sitk
 from loguru import logger as log
@@ -19,6 +19,14 @@ class Result(StrEnum):
     VertebraeLabelNotFound = "VERTEBRAE_LABEL_NOT_FOUND"
     SpineSegmentationFail = "SPINE_SEGMENTATION_FAIL"
     TissueSegmentationFail = "TISSUE_SEGMENTATION_FAIL"
+
+
+@dataclass
+class SegmentationFailureState:
+    paritcipant: str
+    study_uid: str | None
+    series_name: str
+    state: Result | None
 
 
 @dataclass(repr=False)
@@ -159,7 +167,8 @@ SeriesMetadata(
         self.dose_length_product = dose.get("dose_length_product", -1.0)
 
 
-class Centroid(NamedTuple):
+@dataclass
+class Centroid:
     """
     Centroid coordinates (voxel space) of vertebrae body.
     Assumes LPS orientation of `sitk.Image`.
@@ -222,10 +231,27 @@ class TissueMetrics:
     skeletal_muscle_index: float | None = field(default=None)
 
     @classmethod
-    def compute_metrics(
+    def from_mapping(cls, mapping: dict[str, Any]):
+        """
+        Construct `TissueMetrics` from map of tissue metrics.
+        Expects structure:
+        {
+            "area_cm2": {"sat": <float>, ...},
+            "mean_hu": {"sat": <float>, ...},
+            "skeletal_muscle_index": <float>
+        }
+        """
+        return cls(
+            area_cm2=mapping.get("area_cm2"),
+            mean_hu=mapping.get("mean_hu"),
+            skeletal_muscle_index=mapping.get("skeletal_muscle_index"),
+        )
+
+    @classmethod
+    def compute_tissue_metrics(
         cls,
         tissue_vol: sitk.Image,
-        mask: sitk.Image,
+        tissue_mask: sitk.Image,
         patient_height_cm: float | None = None,
     ) -> TissueMetrics:
         """
@@ -233,19 +259,19 @@ class TissueMetrics:
         Expects patient height in centimeters.
         """
 
-        if tissue_vol.GetSize()[-1] == 1 and mask.GetSize()[-1] == 1:
+        if tissue_vol.GetSize()[-1] == 1 and tissue_mask.GetSize()[-1] == 1:
             tissue_vol = tissue_vol[..., 0]
-            mask == mask[..., 0]
+            tissue_mask == tissue_mask[..., 0]
 
         stats_filt = sitk.LabelIntensityStatisticsImageFilter()
-        stats_filt.Execute(tissue_vol, mask)
+        stats_filt.Execute(tissue_vol, tissue_mask)
 
-        area = {
+        area: dict[str, float] = {
             tissue_type: round(stats_filt.GetPhysicalSize(label) / 100.0, ndigits=4)
             for tissue_type, label in TISSUE_LABEL_BY_NAME.items()
         }
 
-        mean_hu = {
+        mean_hu: dict[str, float] = {
             tissue_type: round(stats_filt.GetMean(label), ndigits=4)
             for tissue_type, label in TISSUE_LABEL_BY_NAME.items()
         }
@@ -291,11 +317,15 @@ class SeriesResult:
     volume_z_size: int | None = field(default=None)
     l3_tube_current: float | None = field(default=None)
 
-    def compute_metrics(self, tissue_vol: sitk.Image, mask: sitk.Image) -> None:
+    def compute_tissue_metrics(
+        self, tissue_vol: sitk.Image, mask: sitk.Image, patient_height
+    ) -> None:
         """
-        Convenience method for computing tissue metrics. See `TissueMetrics.compute_metrics()` for more details.
+        Convenience method for computing tissue metrics. See `TissueMetrics.compute_tissue_metrics()` for more details.
         """
-        self.tissue_metrics = TissueMetrics.compute_metrics(tissue_vol, mask)
+        self.tissue_metrics = TissueMetrics.compute_tissue_metrics(
+            tissue_vol, mask, patient_height
+        )
 
     def set_ct_z_size(self, ct_volume: StrPath | sitk.Image):
         if type(ct_volume) is StrPath:

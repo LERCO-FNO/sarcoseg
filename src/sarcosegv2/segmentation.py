@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import lru_cache
 from os import getenv
 from pathlib import Path
@@ -14,11 +15,11 @@ from sarcosegv2.data_io import read_from_json
 from sarcosegv2.data_models import (
     Centroid,
     Result,
+    SegmentationFailureState,
     SegmentationTime,
     SeriesResult,
     StudyMetadata,
     StudySegmentationResult,
-    TissueMetrics,
 )
 from sarcosegv2.labels import TISSUE_HU_RANGES, TISSUE_LABEL_BY_NAME, VERTEBRAE_LABELS
 
@@ -48,7 +49,15 @@ def timed_step(durations: SegmentationTime, step_name: str):
         setattr(durations, step_name, perf_counter() - t0)
 
 
-def segment_ct(
+@dataclass
+class SegImages:
+    ct_volume: sitk.Image
+    tissue_volume: sitk.Image
+    spine_mask: sitk.Image
+    tissue_mask: sitk.Image
+
+
+def segment_study(
     input_dir: StrPath, output_dir: StrPath, study_case: StudyMetadata | None = None
 ) -> tuple[StudySegmentationResult, list]:
 
@@ -70,7 +79,7 @@ def segment_ct(
     # load predictor here, otherwise first tissue segmentation would include model load time
     predictor = get_tissue_predictor()
 
-    failed = []
+    failed: list[SegmentationFailureState] = []
     for nifti_file in nifti_files:
         series_output_dir = nifti_file.parent
         series_metadata = study_case.series_by_name(series_output_dir.name)
@@ -80,7 +89,12 @@ def segment_ct(
                 f"No matching series metadata for nifti file `{series_output_dir}` found, skipping"
             )
             failed.append(
-                (input_dir, series_output_dir.name, Result.SeriesMetadataNotFound)
+                SegmentationFailureState(
+                    study_result.participant,
+                    study_result.study_uid,
+                    series_output_dir.name,
+                    Result.SeriesMetadataNotFound,
+                )
             )
             continue
 
@@ -89,58 +103,30 @@ def segment_ct(
 
         series_result = SeriesResult(series_name, series_metadata.series_uid)
 
-        # ------ SPINE SEGMENTATION ------
-        output_spine_mask = series_output_dir.joinpath("spine_mask.nii.gz")
-        try:
-            with timed_step(series_result.durations, "spine_s"):
-                segment_spine(nifti_file, output_spine_mask)
-        except SegmentationError:
-            log.exception(
-                f"Failed spine segmentation for {series_metadata.series_name}"
+        # ------ SEGMENTATION ------
+        # FIXME: figure out a better return type than SegImages | None and better handling
+        seg_images = segment_ct(nifti_file, series_output_dir, predictor, series_result)
+
+        if seg_images is None:
+            failed.append(
+                SegmentationFailureState(
+                    study_result.participant,
+                    study_result.study_uid,
+                    series_name,
+                    series_result.status,
+                )
             )
-            series_result.status = Result.SpineSegmentationFail
-            failed.append((input_dir, series_name, series_result.status))
-            continue
 
-        # ------ EXTRACT SLICES ------
-        output_tissue_slice = series_output_dir.joinpath("tissue_slice.nii.gz")
-        centroid_result = extract_slices(
-            nifti_file, output_spine_mask, output_tissue_slice
-        )
-        if centroid_result in (Result.ImageWrite, Result.VertebraeLabelNotFound):
-            failed.append((input_dir, series_name, centroid_result))
-            continue
-
-        # ------ TISSUE SEGMENTATION ------
-        # TODO: remove after verifying predictor preload works
-        # predictor = get_tissue_predictor()
-        output_tissue_mask = series_output_dir.joinpath("tissue_mask.nii.gz")
-        try:
-            with timed_step(series_result.durations, "tissue_s"):
-                segment_tissues(output_tissue_slice, output_tissue_mask, predictor)
-        except SegmentationError:
-            log.exception(
-                f"Failed tissue segmentation for {series_metadata.series_name}"
-            )
-            series_result.status = Result.TissueSegmentationFail
-            failed.append((input_dir, series_name, series_result.status))
-            continue
-
-        # ------ TISSUE POSTPROCESS ------
-        postprocess_tissue_mask(
-            output_tissue_slice,
-            output_tissue_mask,
-        )
+        log.debug("Computing metrics...")
 
         # ------ METRICS COMPUTATION ------
-        tissue_vol = sitk.ReadImage(output_tissue_slice)
-        mask_pp = sitk.ReadImage(
-            output_tissue_mask.parent.joinpath("tissue_mask_pp.nii.gz")
-        )
-        series_result.tissue_metrics = TissueMetrics.compute_metrics(
-            tissue_vol, mask_pp, study_result.patient_height
+        series_result.compute_tissue_metrics(
+            seg_images.tissue_volume,
+            seg_images.tissue_mask,
+            study_result.patient_height,
         )
 
+        log.debug("Setting other series related results...")
         # ------ OTHER SERIES RESULT STUFF ------
         series_result.set_ct_z_size(nifti_file)
         series_result.set_l3_tube_current(series_output_dir, centroid_result.z)
@@ -156,6 +142,61 @@ def segment_ct(
     )
 
     return study_result, failed
+
+
+def segment_ct(
+    ct_volume_path: StrPath,
+    series_dir: StrPath,
+    predictor: nnUNetPredictor,
+    series_result: SeriesResult,
+):
+    # ------ SPINE SEGMENTATION ------
+    spine_mask_path = Path(series_dir).joinpath("spine_mask.nii.gz")
+    try:
+        with timed_step(series_result.durations, "spine_s"):
+            segment_spine(ct_volume_path, spine_mask_path)
+    except SegmentationError:
+        log.exception(f"Failed spine segmentation for {series_result.series_name}")
+        series_result.status = Result.SpineSegmentationFail
+        # failed.append((input_dir, series_name, series_result.status))
+        return None
+
+    ct_volume = sitk.ReadImage(ct_volume_path)
+    spine_mask = sitk.ReadImage(spine_mask_path)
+
+    # ------ EXTRACT SLICES ------
+    tissue_slice_path = Path(series_dir).joinpath("tissue_slice.nii.gz")
+    centroid_result = extract_slices(ct_volume, spine_mask, tissue_slice_path)
+    if centroid_result in (Result.ImageWrite, Result.VertebraeLabelNotFound):
+        # failed.append((input_dir, series_name, centroid_result))
+        return None
+
+    # ------ TISSUE SEGMENTATION ------
+    # TODO: remove after verifying predictor preload works
+    # predictor = get_tissue_predictor()
+    tissue_mask_path = Path(series_dir).joinpath("tissue_mask.nii.gz")
+    try:
+        with timed_step(series_result.durations, "tissue_s"):
+            segment_tissues(tissue_slice_path, tissue_mask_path, predictor)
+    except SegmentationError:
+        log.exception(f"Failed tissue segmentation for {series_result.series_name}")
+        series_result.status = Result.TissueSegmentationFail
+        # failed.append((input_dir, series_name, series_result.status))
+        return None
+
+    # ------ TISSUE POSTPROCESS ------
+    tissue_mask_pp_path = tissue_mask_path.parent.joinpath("tissue_mask_pp.nii.gz")
+    with timed_step(series_result.durations, "postprocess_s"):
+        postprocess_tissue_mask(
+            tissue_slice_path, tissue_mask_path, tissue_mask_pp_path
+        )
+
+    return SegImages(
+        ct_volume,
+        sitk.ReadImage(tissue_slice_path),
+        spine_mask,
+        sitk.ReadImage(tissue_mask_pp_path),
+    )
 
 
 def segment_spine(
@@ -279,7 +320,9 @@ def find_vertebrae_body_centroid(
     return Centroid(**spine_mask.TransformPhysicalPointToIndex(phys_coords))
 
 
-def postprocess_tissue_mask(tissue_slice: StrPath, tissue_mask: StrPath):
+def postprocess_tissue_mask(
+    tissue_slice: StrPath, tissue_mask: StrPath, output_pp_mask: StrPath | None = None
+):
     """
     Relabel IMAT and VAT masks within specific HU range:
     `muscle` mask labels with HU values within (-190, -30) (both inclusive) replaced with `imat` mask label.
@@ -324,6 +367,7 @@ def postprocess_tissue_mask(tissue_slice: StrPath, tissue_mask: StrPath):
     non_vat_thresh = sitk.BinaryOpeningByReconstruction(non_vat_thresh)
     mask_image[non_vat_thresh] = 0
 
-    output_pp_mask = tissue_mask.parent.joinpath("tissue_mask_pp.nii.gz")
+    if output_pp_mask is None:
+        output_pp_mask = tissue_mask.parent.joinpath("tissue_mask_pp.nii.gz")
     sitk.WriteImage(mask_image, output_pp_mask)
     log.info(f"Written postprocessed mask to `{output_pp_mask}`")
