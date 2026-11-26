@@ -72,9 +72,7 @@ def preprocess_study(
         f"{study_metadata.participant}_{study_metadata.study_uid}"
     )
     output_dir.mkdir(exist_ok=True, parents=True)
-    filepath = output_dir.joinpath(
-        f"dicom_tags_{study_metadata.participant}_{study_metadata.study_uid}.json"
-    )
+    filepath = output_dir.joinpath(f"dicom_tags.json")
 
     # write_to_json(currents_by_series, output_dir.joinpath("currents_by_series.json"))
     series_to_nifti: list[SeriesIdentity] = [

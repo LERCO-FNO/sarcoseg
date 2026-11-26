@@ -56,7 +56,7 @@ def segment_ct(
     output_dir = Path(output_dir)
 
     if study_case is None:
-        dicom_metadata_file = input_dir.joinpath(f"dicom_tags_{input_dir.name}.json")
+        dicom_metadata_file = input_dir.joinpath(f"dicom_tags.json")
         study_case = StudyMetadata.from_mapping(read_from_json(dicom_metadata_file))
 
     nifti_files = list(input_dir.rglob("input_volume.nii.gz"))
