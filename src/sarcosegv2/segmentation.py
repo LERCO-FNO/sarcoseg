@@ -18,6 +18,7 @@ from sarcosegv2.data_models import (
     Result,
     SegmentationFailureState,
     SegmentationTime,
+    SeriesMetadata,
     SeriesResult,
     StudyMetadata,
     StudySegmentationResult,
@@ -83,7 +84,9 @@ def segment_study(
     failed: list[SegmentationFailureState] = []
     for nifti_file in nifti_files:
         series_output_dir = nifti_file.parent
-        series_metadata = study_case.series_by_name(series_output_dir.name)
+        series_metadata = SeriesMetadata.from_mapping(
+            read_from_json(series_output_dir.joinpath("series.json"))
+        )
 
         if series_metadata is None:
             log.error(

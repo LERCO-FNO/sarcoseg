@@ -68,21 +68,21 @@ StudyMetadata(
             participant=map["participant"],
             study_uid=map.get("study_uid"),
             patient_height=map.get("patient_height"),
-            series=map.get("series"),
+            series=map.get("series", []),
         )
 
-    def series_by_name(self, series_name: str) -> SeriesMetadata | None:
-        """
-        Convenience method to access series by `series_name` key.
-
-        Returns
-        -------
-        SeriesMetadata or None
-        """
-        series = self.series.get(series_name)
-        if not series:
-            log.warning(f"StudyMetadata has no series by {series_name}")
-        return series
+    # def series_by_name(self, series_name: str) -> SeriesMetadata | None:
+    #     """
+    #     Convenience method to access series by `series_name` key.
+    #
+    #     Returns
+    #     -------
+    #     SeriesMetadata or None
+    #     """
+    #     series = self.series.get(series_name)
+    #     if not series:
+    #         log.warning(f"StudyMetadata has no series by {series_name}")
+    #     return series
 
     def to_mapping(self) -> Mapping[str, Any]:
         return asdict(self)
