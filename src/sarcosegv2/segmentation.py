@@ -78,7 +78,7 @@ def segment_study(
     study_result = StudySegmentationResult.from_study_metadata(study_case)
     log.info(f"Segmenting study case {study_result.participant}")
 
-    # load predictor here, otherwise first tissue segmentation would include model load time
+    # load predictor here, because first tissue segmentation with loading model would include model load time
     predictor = get_tissue_predictor()
 
     failed: list[SegmentationFailureState] = []
@@ -306,7 +306,9 @@ def extract_slices(
     if centroid is None:
         return Result.VertebraeLabelNotFound
 
-    # save as 3D image of dimensions (x, y, 1)
+    # tissue segmentation only requires the single slice at centroid index
+    # NOTE: try tissue segmentation with full vertebrae body and then extract centroid slice
+    # Compare any difference in duration, mask quality/precision
     tissue_slice = ct_volume[..., centroid.z : centroid.z + 1]
 
     # output_tissue_slice = output_tissue_slice.joinpath("tissue_slice.nii.gz")
