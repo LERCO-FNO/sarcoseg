@@ -252,8 +252,8 @@ class TissueMetrics:
         }
         """
         return cls(
-            area_cm2=mapping.get("area_cm2"),
-            mean_hu=mapping.get("mean_hu"),
+            area_cm2=mapping["area_cm2"],
+            mean_hu=mapping["mean_hu"],
             skeletal_muscle_index=mapping.get("skeletal_muscle_index"),
         )
 
