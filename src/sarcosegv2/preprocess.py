@@ -121,7 +121,7 @@ def extract_series_metadata(
     dose_by_irrad_uid: DoseByIrradUID | None = None,
 ) -> list[SeriesMetadata]:
     """
-    Select the highest-resolution series (thinnest slices and highest slice count) per contrast phase.
+    Extracts series-level DICOM tags.
 
     Parameters
     ----------
@@ -190,8 +190,8 @@ def select_series_to_segment(
     candidate_series: list[SeriesMetadata],
 ) -> dict[str, SeriesMetadata]:
     """
-    Select series with lowest slice thickness per contrast phase.
-    Uses highest slice count to resolve equal slice thickness, otherwise returns result of `min()`.
+    Select series the best resolution per contrast phase based on lowest slice thickness and highest slice count.
+    Slice count used to resolve equal slice thickness, otherwise returns result of `min()`.
     Each contrast phase can have only one series for segmentation.
 
     Parameters
