@@ -346,13 +346,19 @@ SeriesResult(
 
     @classmethod
     def from_mapping(cls, mapping: dict[str, Any]):
+        if (series_name := mapping.get("series_name")) is None:
+            raise KeyError("Key `series_name` not found")
+
+        tiss = mapping.get("tissue_metrics")
+        dur = mapping.get("durations")
+
         return cls(
-            series_name=mapping.get("series_name"),
+            series_name=mapping["series_name"],
             series_uid=mapping.get("series_uid"),
             status=mapping.get("status"),
             vertebrae_centroid=mapping.get("vertebrae_centroid"),
-            tissue_metrics=TissueMetrics.from_mapping(mapping.get("tissue_metrics")),
-            durations=SegmentationTime.from_mapping(mapping.get("durations")),
+            tissue_metrics=TissueMetrics.from_mapping(tiss) if tiss else None,
+            durations=SegmentationTime.from_mapping(dur) if dur else None,
             volume_z_size=mapping.get("volume_z_size"),
             ct_pixel_spacing=mapping.get("ct_pixel_spacing", ()),
             l3_tube_current=mapping.get("l3_tube_current"),
