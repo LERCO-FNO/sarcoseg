@@ -362,3 +362,41 @@ class StudySegmentationResult:
             study_case.study_uid,
             patient_height=study_case.patient_height,
         )
+
+    @classmethod
+    def from_mapping(cls, mapping: dict[str, Any]):
+        # mapping = read_from_json(filepath)
+        participant = mapping.get("participant")
+
+        if participant is None:
+            raise KeyError("Key `participant` not found in `{filepath}`")
+        elif participant.lower() in ("null", "nan", "none") or len(participant) == 0:
+            raise ValueError(
+                f"Key `participant` requires non-null or non-empty value, got {participant}"
+            )
+
+        result = StudySegmentationResult(
+            participant=mapping.get("participant"),
+            study_uid=mapping.get("study_uid"),
+            patient_height=mapping.get("patient_height"),
+            series={
+                series_name: SeriesResult.from_mapping(data)
+                for series_name, data in mapping.get("series", {}).items()
+            },
+        )
+        return result
+
+    def to_mapping(self) -> dict[str, Any]:
+        # output_dir = Path(output_dir)
+
+        return asdict(self, dict_factory=lambda d: {key: val for key, val in d})
+        # filepath = output_dir.joinpath(
+        #     f"seg_result_{self.participant}_{self.study_uid}.json"
+        # )
+        # if filepath.exists():
+        #     log.warning(f"Overwriting existing segmentation results `{filepath}`")
+        #
+        # write_to_json(serialized, filepath)
+        # log.info(
+        #     f"Written segmentation results for participant {self.participant} (study uid {self.study_uid})"
+        # )
