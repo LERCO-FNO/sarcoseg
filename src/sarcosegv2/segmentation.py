@@ -164,7 +164,7 @@ def segment_ct(
     series_dir: StrPath,
     predictor: nnUNetPredictor,
     series_result: SeriesResult,
-):
+) -> SegImages | None:
     # ------ SPINE SEGMENTATION ------
     spine_mask_path = Path(series_dir).joinpath("spine_mask.nii.gz")
     try:
