@@ -189,6 +189,14 @@ class SegmentationTime:
     tissue_s: float | None = None
     postprocess_s: float | None = None
 
+    @classmethod
+    def from_mapping(cls, mapping: dict[str, Any]):
+        return cls(
+            mapping.get("spine_s"),
+            mapping.get("tissue_s"),
+            mapping.get("postprocess_s"),
+        )
+
 
 @dataclass(frozen=True)
 class TissueArea:
