@@ -89,18 +89,21 @@ def preprocess_study(
     write_to_nifti(study_dir, output_dir, series_to_nifti)
 
 
-# Restructure map for the purpose of guessing contrast phase by pattern matching.
-# From contrast-phase: series-desc-pattern:
-# {
-# "phase": ["patt1", "patt2", ...],
-# ...
-# }
-# into series-descritpion-pattern: contrast-phase:
-# {
-# "patt1": "phase",
-# "patt2": "phase",
-# ...
-# }
+"""
+Restructure map for the purpose of guessing contrast phase by pattern matching.
+From contrast_phase by series_desc_pattern:
+{
+  "phase": ["patt1", "patt2", ...],
+  ...
+} 
+
+into series_desc_pattern by contrast-phase:
+{
+  "patt1": "phase",
+  "patt2": "phase",
+  ...
+}
+"""
 PHASE_BY_CONTRAST_PATTERN = {
     pattrn: phase
     for phase, pattrns in CONTRAST_PHASE_DESC_PATTERNS.items()
