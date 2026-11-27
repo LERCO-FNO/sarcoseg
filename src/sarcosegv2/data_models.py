@@ -355,6 +355,16 @@ class StudySegmentationResult:
     patient_height: float | None = field(default=None, compare=False)
     series: dict[str, SeriesResult] = field(default_factory=dict, compare=False)
 
+    def __repr__(self):
+        return f"""
+StudySegmentationResult(
+    participant={self.participant!r},
+    study_uid={self.study_uid!r},
+    patient_height={self.patient_height!r},
+    series={tuple(self.series.keys())}
+)
+        """
+
     @classmethod
     def from_study_metadata(cls, study_case: StudyMetadata) -> StudySegmentationResult:
         return cls(
