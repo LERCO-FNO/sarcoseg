@@ -125,6 +125,7 @@ def segment_study(
         log.debug("Computing metrics...")
         seg_images, durations = seg_result
         series_result.durations = durations
+
         # ------ METRICS COMPUTATION ------
         series_result.compute_tissue_metrics(
             seg_images.tissue_volume,
@@ -169,7 +170,6 @@ def segment_ct(
     ct_volume_path: StrPath,
     series_dir: StrPath,
     predictor: nnUNetPredictor,
-    # series_result: SeriesResult,
 ) -> tuple[SegImages, SegmentationTime] | Result:
     durations = SegmentationTime()
     # ------ SPINE SEGMENTATION ------
@@ -179,8 +179,6 @@ def segment_ct(
             segment_spine(ct_volume_path, spine_mask_path)
     except SegmentationError:
         log.exception(f"Failed spine segmentation for `{ct_volume_path}`")
-        # series_result.status = Result.SpineSegmentationFail
-        # failed.append((input_dir, series_name, series_result.status))
         return Result.SpineSegmentationFail
 
     ct_volume = sitk.ReadImage(ct_volume_path)
@@ -190,7 +188,6 @@ def segment_ct(
     tissue_slice_path = Path(series_dir).joinpath("tissue_slice.nii.gz")
     centroid_result = extract_slices(ct_volume, spine_mask, tissue_slice_path)
     if centroid_result in (Result.ImageWrite, Result.VertebraeLabelNotFound):
-        # failed.append((input_dir, series_name, centroid_result))
         return Result.VertebraeLabelNotFound
 
     # ------ TISSUE SEGMENTATION ------
@@ -202,8 +199,6 @@ def segment_ct(
             segment_tissues(tissue_slice_path, tissue_mask_path, predictor)
     except SegmentationError:
         log.exception(f"Failed tissue segmentation for `{ct_volume_path}`")
-        # series_result.status = Result.TissueSegmentationFail
-        # failed.append((input_dir, series_name, series_result.status))
         return Result.TissueSegmentationFail
 
     # ------ TISSUE POSTPROCESS ------
@@ -229,7 +224,6 @@ def segment_spine(
     is_verbose = True if debug else False
 
     log.debug(f"Segmenting spine of `{input_nifti}`")
-    # start = perf_counter()
     try:
         totalsegmentator(
             input_nifti,
@@ -243,8 +237,6 @@ def segment_spine(
         )
     except RuntimeError as err:
         raise SegmentationError(f"Spine segmentation failed for {input_nifti}") from err
-    # elapsed = perf_counter() - start
-    # log.debug(f"Spine segmentation finished in {elapsed:.4f} seconds")
 
 
 def segment_tissues(
@@ -311,7 +303,6 @@ def extract_slices(
     # Compare any difference in duration, mask quality/precision
     tissue_slice = ct_volume[..., centroid.z : centroid.z + 1]
 
-    # output_tissue_slice = output_tissue_slice.joinpath("tissue_slice.nii.gz")
     if output_tissue_slice.exists():
         log.warning(f"Overwriting `{output_tissue_slice}`")
     try:

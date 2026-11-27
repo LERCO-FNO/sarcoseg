@@ -17,7 +17,6 @@ from sarcosegv2.series_filter import (
 )
 from sarcosegv2.utils import find_dicoms
 
-# type CurrentBySeries = defaultdict[str, Mapping[str, float]]
 type DoseByIrradUID = Mapping[str, Mapping[str, float | int]]
 
 
@@ -74,7 +73,6 @@ def preprocess_study(
     )
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    # write_to_json(currents_by_series, output_dir.joinpath("currents_by_series.json"))
     for series_meta in selected_series.values():
         series_dir = output_dir.joinpath(series_meta.series_name)
         series_dir.mkdir(exist_ok=True, parents=True)

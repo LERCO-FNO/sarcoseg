@@ -10,8 +10,6 @@ from SimpleITK import ImageSeriesReader, WriteImage
 
 from sarcosegv2._types import SeriesIdentity, StrPath
 
-# from sarcosegv2.data_models import SeriesMetadata
-
 
 def find_study_input(input_dir: StrPath, study_uid: str) -> Path | None:
     """

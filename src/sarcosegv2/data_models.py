@@ -5,11 +5,8 @@ from pathlib import Path
 from typing import Any
 
 import SimpleITK as sitk
-from loguru import logger as log
 
-from sarcosegv2._types import SeriesIdentity, StrPath
-
-# from sarcosegv2.data_io import read_from_json
+from sarcosegv2._types import StrPath
 from sarcosegv2.labels import TISSUE_LABEL_BY_NAME
 from sarcosegv2.utils import tube_current_by_instance_number
 
@@ -70,19 +67,6 @@ StudyMetadata(
             patient_height=map.get("patient_height"),
             series=map.get("series", []),
         )
-
-    # def series_by_name(self, series_name: str) -> SeriesMetadata | None:
-    #     """
-    #     Convenience method to access series by `series_name` key.
-    #
-    #     Returns
-    #     -------
-    #     SeriesMetadata or None
-    #     """
-    #     series = self.series.get(series_name)
-    #     if not series:
-    #         log.warning(f"StudyMetadata has no series by {series_name}")
-    #     return series
 
     def to_mapping(self) -> Mapping[str, Any]:
         return asdict(self)
@@ -409,7 +393,6 @@ StudySegmentationResult(
 
     @classmethod
     def from_mapping(cls, mapping: dict[str, Any]):
-        # mapping = read_from_json(filepath)
         participant = mapping.get("participant")
 
         if participant is None:
@@ -431,16 +414,4 @@ StudySegmentationResult(
         return result
 
     def to_mapping(self) -> dict[str, Any]:
-        # output_dir = Path(output_dir)
-
         return asdict(self, dict_factory=lambda d: {key: val for key, val in d})
-        # filepath = output_dir.joinpath(
-        #     f"seg_result_{self.participant}_{self.study_uid}.json"
-        # )
-        # if filepath.exists():
-        #     log.warning(f"Overwriting existing segmentation results `{filepath}`")
-        #
-        # write_to_json(serialized, filepath)
-        # log.info(
-        #     f"Written segmentation results for participant {self.participant} (study uid {self.study_uid})"
-        # )
