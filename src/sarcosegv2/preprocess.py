@@ -17,7 +17,7 @@ from sarcosegv2.series_filter import (
 )
 from sarcosegv2.utils import find_dicoms
 
-type CurrentBySeries = defaultdict[str, Mapping[str, float]]
+# type CurrentBySeries = defaultdict[str, Mapping[str, float]]
 type DoseByIrradUID = Mapping[str, Mapping[str, float | int]]
 
 
@@ -66,20 +66,28 @@ def preprocess_study(
         log.warning(f"No dose data found for study at `{study_dir}`")
 
     series_metadatas = extract_series_metadata(datasets_by_uid, dose_by_irrad_uid)
-    study_metadata.series = select_series_to_segment(series_metadatas)
+    selected_series = select_series_to_segment(series_metadatas)
+    study_metadata.series = list(selected_series.keys())
 
     output_dir = output_dir.joinpath(
         f"{study_metadata.participant}_{study_metadata.study_uid}"
     )
     output_dir.mkdir(exist_ok=True, parents=True)
-    filepath = output_dir.joinpath(f"dicom_tags.json")
 
     # write_to_json(currents_by_series, output_dir.joinpath("currents_by_series.json"))
+    for series_meta in selected_series.values():
+        series_dir = output_dir.joinpath(series_meta.series_name)
+        series_dir.mkdir(exist_ok=True, parents=True)
+        filepath = series_dir.joinpath(f"series.json")
+        write_to_json(series_meta.to_mapping(), filepath)
+
+    filepath = output_dir.joinpath(f"study.json")
+    write_to_json(study_metadata.to_mapping(), filepath)
+
     series_to_nifti: list[SeriesIdentity] = [
         SeriesIdentity(series.series_name, series.series_uid)
-        for series in study_metadata.series.values()
+        for series in selected_series.values()
     ]
-    write_to_json(study_metadata.to_mapping(), filepath)
     write_to_nifti(study_dir, output_dir, series_to_nifti)
 
 

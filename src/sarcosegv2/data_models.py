@@ -7,7 +7,8 @@ from typing import Any
 import SimpleITK as sitk
 from loguru import logger as log
 
-from sarcosegv2._types import StrPath
+from sarcosegv2._types import SeriesIdentity, StrPath
+
 # from sarcosegv2.data_io import read_from_json
 from sarcosegv2.labels import TISSUE_LABEL_BY_NAME
 from sarcosegv2.utils import tube_current_by_instance_number
@@ -35,7 +36,7 @@ class StudyMetadata:
     participant: str
     study_uid: str | None = field(default=None)
     patient_height: float | int | None = field(default=None, compare=False)
-    series: dict[str, SeriesMetadata] = field(default_factory=dict, compare=False)
+    series: list[str] = field(default_factory=list, compare=False)
 
     def __repr__(self):
         return f"""
@@ -43,7 +44,7 @@ StudyMetadata(
     participant={self.participant!r},
     study_uid={self.study_uid!r},
     patient_height={self.patient_height!r},
-    series={tuple(self.series.keys())}
+    series={self.series}
 )
         """
 
