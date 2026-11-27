@@ -137,8 +137,8 @@ SeriesMetadata(
             )
 
         return cls(
-            series_uid=map["uid"],
-            series_name=map["name"],
+            series_uid=map["series_uid"],
+            series_name=map["series_name"],
             series_number=map["series_number"],
             description=map.get("description"),
             contrast_phase=map.get("contrast_phase"),
