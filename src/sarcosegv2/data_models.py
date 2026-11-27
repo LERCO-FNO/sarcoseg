@@ -352,10 +352,10 @@ class SeriesResult:
             tissue_vol, mask, patient_height
         )
 
-    def set_l3_tube_current(self, series_dir: StrPath, instance_num: int):
+    def set_l3_tube_current(self, series_dir: StrPath):
         filepath = Path(series_dir).joinpath("tube_currents_by_instance.json")
         self.l3_tube_current = tube_current_by_instance_number(
-            filepath, self.series_name, instance_num
+            filepath, self.series_name, self.vertebrae_centroid.z
         )
 
 
