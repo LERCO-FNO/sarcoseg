@@ -327,6 +327,22 @@ class SeriesResult:
     volume_z_size: int | None = field(default=None)
     ct_pixel_spacing: tuple[float, float, float] = field(default_factory=tuple)
     l3_tube_current: float | None = field(default=None)
+    def __repr__(self):
+        return f"""
+SeriesResult(
+    series_name={self.series_name!r},
+    study_uid={self.series_uid!r},
+    status={self.status!r},
+)
+        """
+
+    def __format__(self, spec: str) -> str:
+        if spec == "v":
+            parts = "\n    ".join(
+                f"{f.name}={getattr(self, f.name)!r}" for f in fields(self)
+            )
+            return f"{type(self).__name__}({parts})"
+        return repr(self)
 
     @classmethod
     def from_mapping(cls, mapping: dict[str, Any]):
