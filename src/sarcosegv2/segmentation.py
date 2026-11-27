@@ -109,20 +109,22 @@ def segment_study(
 
         # ------ SEGMENTATION ------
         # FIXME: figure out a better return type than SegImages | None and better handling
-        seg_images = segment_ct(nifti_file, series_output_dir, predictor, series_result)
+        seg_result = segment_ct(nifti_file, series_output_dir, predictor)
 
-        if seg_images is None:
+        if type(seg_result) is Result:
             failed.append(
                 SegmentationFailureState(
                     study_result.participant,
                     study_result.study_uid,
                     series_name,
-                    series_result.status,
+                    seg_result,
                 )
             )
+            continue
 
         log.debug("Computing metrics...")
-
+        seg_images, durations = seg_result
+        series_result.durations = durations
         # ------ METRICS COMPUTATION ------
         series_result.compute_tissue_metrics(
             seg_images.tissue_volume,
@@ -167,18 +169,19 @@ def segment_ct(
     ct_volume_path: StrPath,
     series_dir: StrPath,
     predictor: nnUNetPredictor,
-    series_result: SeriesResult,
-) -> SegImages | None:
+    # series_result: SeriesResult,
+) -> tuple[SegImages, SegmentationTime] | Result:
+    durations = SegmentationTime()
     # ------ SPINE SEGMENTATION ------
     spine_mask_path = Path(series_dir).joinpath("spine_mask.nii.gz")
     try:
-        with timed_step(series_result.durations, "spine_s"):
+        with timed_step(durations, "spine_s"):
             segment_spine(ct_volume_path, spine_mask_path)
     except SegmentationError:
-        log.exception(f"Failed spine segmentation for {series_result.series_name}")
-        series_result.status = Result.SpineSegmentationFail
+        log.exception(f"Failed spine segmentation for `{ct_volume_path}`")
+        # series_result.status = Result.SpineSegmentationFail
         # failed.append((input_dir, series_name, series_result.status))
-        return None
+        return Result.SpineSegmentationFail
 
     ct_volume = sitk.ReadImage(ct_volume_path)
     spine_mask = sitk.ReadImage(spine_mask_path)
@@ -188,24 +191,24 @@ def segment_ct(
     centroid_result = extract_slices(ct_volume, spine_mask, tissue_slice_path)
     if centroid_result in (Result.ImageWrite, Result.VertebraeLabelNotFound):
         # failed.append((input_dir, series_name, centroid_result))
-        return None
+        return Result.VertebraeLabelNotFound
 
     # ------ TISSUE SEGMENTATION ------
     # TODO: remove after verifying predictor preload works
     # predictor = get_tissue_predictor()
     tissue_mask_path = Path(series_dir).joinpath("tissue_mask.nii.gz")
     try:
-        with timed_step(series_result.durations, "tissue_s"):
+        with timed_step(durations, "tissue_s"):
             segment_tissues(tissue_slice_path, tissue_mask_path, predictor)
     except SegmentationError:
-        log.exception(f"Failed tissue segmentation for {series_result.series_name}")
-        series_result.status = Result.TissueSegmentationFail
+        log.exception(f"Failed tissue segmentation for `{ct_volume_path}`")
+        # series_result.status = Result.TissueSegmentationFail
         # failed.append((input_dir, series_name, series_result.status))
-        return None
+        return Result.TissueSegmentationFail
 
     # ------ TISSUE POSTPROCESS ------
     tissue_mask_pp_path = tissue_mask_path.parent.joinpath("tissue_mask_pp.nii.gz")
-    with timed_step(series_result.durations, "postprocess_s"):
+    with timed_step(durations, "postprocess_s"):
         postprocess_tissue_mask(
             tissue_slice_path, tissue_mask_path, tissue_mask_pp_path
         )
@@ -215,7 +218,7 @@ def segment_ct(
         sitk.ReadImage(tissue_slice_path),
         spine_mask,
         sitk.ReadImage(tissue_mask_pp_path),
-    )
+    ), durations
 
 
 def segment_spine(
