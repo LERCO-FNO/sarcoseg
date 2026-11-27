@@ -129,7 +129,7 @@ def segment_study(
 
         log.debug("Setting other series related results...")
         # ------ OTHER SERIES RESULT STUFF ------
-        series_result.ct_z_size = seg_images.ct_volume.GetDepth()
+        series_result.volume_z_size = seg_images.ct_volume.GetDepth()
         series_result.ct_pixel_spacing = seg_images.ct_volume.GetSpacing()
         series_result.set_l3_tube_current(series_output_dir, centroid_result.z)
 

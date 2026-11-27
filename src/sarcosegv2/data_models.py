@@ -352,11 +352,6 @@ class SeriesResult:
             tissue_vol, mask, patient_height
         )
 
-    def set_ct_z_size(self, ct_volume: StrPath | sitk.Image):
-        if type(ct_volume) is StrPath:
-            ct_volume = sitk.ReadImage(ct_volume)
-        self.ct_z_size = ct_volume.GetDepth()
-
     def set_l3_tube_current(self, series_dir: StrPath, instance_num: int):
         filepath = Path(series_dir).joinpath("tube_currents_by_instance.json")
         self.l3_tube_current = tube_current_by_instance_number(
