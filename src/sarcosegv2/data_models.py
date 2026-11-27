@@ -319,14 +319,15 @@ class SeriesResult:
     """
 
     series_name: str
-    series_uid: str | None = field(default=None)
-    status: Result | None = field(default=None)
-    vertebrae_centroid: Centroid | None = field(default=None)
-    tissue_metrics: TissueMetrics = field(default_factory=TissueMetrics)
-    durations: SegmentationTime = field(default_factory=SegmentationTime)
-    volume_z_size: int | None = field(default=None)
-    ct_pixel_spacing: tuple[float, float, float] = field(default_factory=tuple)
-    l3_tube_current: float | None = field(default=None)
+    series_uid: str | None = None
+    status: Result | None = None
+    vertebrae_centroid: Centroid | None = None
+    tissue_metrics: TissueMetrics | None = None
+    durations: SegmentationTime | None = None
+    volume_z_size: int | None = None
+    ct_pixel_spacing: tuple[float, float, float] | None = None
+    l3_tube_current: float | None = None
+
     def __repr__(self):
         return f"""
 SeriesResult(
