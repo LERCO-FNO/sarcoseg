@@ -326,6 +326,20 @@ class SeriesResult:
     volume_z_size: int | None = field(default=None)
     l3_tube_current: float | None = field(default=None)
 
+    @classmethod
+    def from_mapping(cls, mapping: dict[str, Any]):
+        return cls(
+            series_name=mapping.get("series_name"),
+            series_uid=mapping.get("series_uid"),
+            status=mapping.get("status"),
+            vertebrae_centroid=mapping.get("vertebrae_centroid"),
+            tissue_metrics=TissueMetrics.from_mapping(mapping.get("tissue_metrics")),
+            durations=SegmentationTime.from_mapping(mapping.get("durations")),
+            volume_z_size=mapping.get("volume_z_size"),
+            ct_pixel_spacing=mapping.get("ct_pixel_spacing", ()),
+            l3_tube_current=mapping.get("l3_tube_current"),
+        )
+
     def compute_tissue_metrics(
         self, tissue_vol: sitk.Image, mask: sitk.Image, patient_height
     ) -> None:
