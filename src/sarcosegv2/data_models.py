@@ -8,8 +8,9 @@ import SimpleITK as sitk
 from loguru import logger as log
 
 from sarcosegv2._types import StrPath
-from sarcosegv2.data_io import read_from_json
+# from sarcosegv2.data_io import read_from_json
 from sarcosegv2.labels import TISSUE_LABEL_BY_NAME
+from sarcosegv2.utils import tube_current_by_instance_number
 
 
 class Result(StrEnum):
@@ -99,10 +100,10 @@ class SeriesMetadata:
     slice_count: int | None = None
     irradiation_event_uid: str | None = None
     kilo_voltage_peak: float | None = None
-    currents_by_instance: dict[str, float] | None = None
     mean_tube_current: float | None = None
     mean_ctdi_vol: float | None = None
     dose_length_product: float | None = None
+    currents_by_instance: dict[str, float] | None = None
 
     def __repr__(self):
         return f"""
@@ -340,19 +341,11 @@ class SeriesResult:
             ct_volume = sitk.ReadImage(ct_volume)
         self.ct_z_size = ct_volume.GetDepth()
 
-    def set_l3_tube_current(self, series_dir: StrPath, instance_index: int):
-        currents_by_inst = read_from_json(
-            Path(series_dir).joinpath(
-                f"dicom_tags_{self.series_name}_{self.series_uid}.json"
-            )
-        )["series"].get(self.series_name)["currents_by_instance"]
-
-        if currents_by_inst is None:
-            log.warning(
-                f"Series {self.series_name} (uid {self.series_uid}) has no tube currents in dicom_tags json"
-            )
-
-        self.l3_tube_current = currents_by_inst.get(str(instance_index))
+    def set_l3_tube_current(self, series_dir: StrPath, instance_num: int):
+        filepath = Path(series_dir).joinpath("tube_currents_by_instance.json")
+        self.l3_tube_current = tube_current_by_instance_number(
+            filepath, self.series_name, instance_num
+        )
 
 
 @dataclass(repr=False)

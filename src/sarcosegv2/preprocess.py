@@ -160,8 +160,8 @@ def extract_series_metadata(
             slice_count=len(datasets),
             irradiation_event_uid=ds.get("IrradiationEventUID"),
             kilo_voltage_peak=float(ds.get("KVP", -1.0)),
-            currents_by_instance=currents_by_instance,
             mean_tube_current=mean_current,
+            currents_by_instance=currents_by_instance,
         )
 
         if dose_by_irrad_uid and series_meta.irradiation_event_uid:
