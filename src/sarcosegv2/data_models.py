@@ -419,7 +419,7 @@ StudySegmentationResult(
             )
 
         result = StudySegmentationResult(
-            participant=mapping.get("participant"),
+            participant=participant,
             study_uid=mapping.get("study_uid"),
             patient_height=mapping.get("patient_height"),
             series={
