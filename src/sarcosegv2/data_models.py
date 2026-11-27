@@ -315,6 +315,7 @@ class SeriesResult:
     tissue_metrics: TissueMetrics = field(default_factory=TissueMetrics)
     durations: SegmentationTime = field(default_factory=SegmentationTime)
     volume_z_size: int | None = field(default=None)
+    ct_pixel_spacing: tuple[float, float, float] = field(default_factory=tuple)
     l3_tube_current: float | None = field(default=None)
 
     def compute_tissue_metrics(
