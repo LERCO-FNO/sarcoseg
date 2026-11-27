@@ -118,7 +118,7 @@ SeriesMetadata(
 
     def __format__(self, spec: str) -> str:
         if spec == "v":
-            parts = "\n\t".join(
+            parts = "\n    ".join(
                 f"{f.name}={getattr(self, f.name)!r}" for f in fields(self)
             )
             return f"{type(self).__name__}({parts})"
